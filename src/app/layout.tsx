@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AppShell } from "@/components/layout/app-shell";
+import { EstadoFinanceiroProvider } from "@/state/estado-financeiro-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -39,7 +40,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body>
-        <AppShell>{children}</AppShell>
+        <EstadoFinanceiroProvider>
+          <AppShell>{children}</AppShell>
+        </EstadoFinanceiroProvider>
       </body>
     </html>
   );

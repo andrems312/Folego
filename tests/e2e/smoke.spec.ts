@@ -23,3 +23,17 @@ test("a navegação leva às outras áreas", async ({ page }) => {
   await expect(page).toHaveURL(/\/movimentacoes$/);
   await expect(page.getByText("Em construção")).toBeVisible();
 });
+
+test("persiste o estado no localStorage (chave versionada) após hidratar", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // Espera a hidratação concluir (o resumo só aparece quando 'pronto').
+  await expect(page.getByText(/1\.330,00/).first()).toBeVisible();
+
+  const salvo = await page.evaluate(() =>
+    window.localStorage.getItem("folego:estado:v1"),
+  );
+  expect(salvo).toBeTruthy();
+  expect(salvo).toContain('"versao":1');
+});
