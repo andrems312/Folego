@@ -6,6 +6,7 @@
  */
 export * from "./types";
 export * from "./money";
+export * from "./data";
 export * from "./movimentacao";
 export * from "./calculations";
 export * from "./projection";

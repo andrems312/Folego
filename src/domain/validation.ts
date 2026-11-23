@@ -8,12 +8,13 @@
  * Framework-agnóstico (sem React).
  */
 import { z } from "zod";
+import { ehDataValida } from "./data";
 import { parseBRLParaCentavos } from "./money";
 import type { EstadoFinanceiro } from "./types";
 
 const dataISO = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Data deve estar no formato AAAA-MM-DD");
+  .refine(ehDataValida, "Data inválida: use AAAA-MM-DD com dia e mês que existam.");
 
 export const movimentacaoTipoSchema = z.enum(["entrada", "saida", "retirada"]);
 export const movimentacaoStatusSchema = z.enum(["realizado", "pendente"]);

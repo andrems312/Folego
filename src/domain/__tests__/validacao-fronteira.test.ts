@@ -78,6 +78,12 @@ describe("P3 — validação de fronteira do estado financeiro", () => {
     expect(validarEstadoFinanceiro(e).ok).toBe(false);
   });
 
+  it("rejeita data de calendário impossível (ex.: 2026-02-31)", () => {
+    const e = valido();
+    e.movimentacoes[0]!.data = "2026-02-31";
+    expect(validarEstadoFinanceiro(e).ok).toBe(false);
+  });
+
   it("rejeita incoerência entre status e valorPago", () => {
     const e = valido();
     // totalmente paga mas ainda marcada como pendente
