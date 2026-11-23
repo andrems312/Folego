@@ -81,6 +81,7 @@ Movimentacao
   data          : date        // competência/vencimento OU data de realização
   categoria     : CategoriaId
   status        : 'realizado' | 'pendente'
+  valorPago     : number | null   // centavos já pagos (pagamento parcial); ausente => modelo atômico
   formaPagamento: 'pix' | 'dinheiro' | 'transferencia' | 'cartao' | 'outro' | null  // etiqueta opcional
   reservaId     : ReservaId | null   // vínculo p/ evitar dupla contagem
   descricao     : string | null
@@ -155,6 +156,25 @@ comprometido = totalReservas + contasPendentesNaoCobertas
 - Pagar a conta vinculada é uma **saída realizada** que baixa a reserva: a reserva
   diminui e o saldo em conta diminui no mesmo ato — sem novo desconto no disponível.
 
+**Pagamento parcial (regra).** Uma conta pode ser paga em partes. O campo
+`valorPago` guarda quanto já foi pago; `saldoPendente = valor − valorPago`. Regras:
+
+- O **saldo real** cai apenas pelo valor **efetivamente pago** (parcial inclusive).
+- O **comprometido** e a **projeção** usam o **saldo pendente** (restante), nunca o
+  valor original.
+- Uma conta só é **quitada** (`status = realizado`) quando `saldoPendente` chega a 0.
+- Se vinculada a reserva, cada pagamento baixa a reserva por `min(valorPago, saldoReserva)`
+  — a cobertura acompanha o pagamento, sem dupla contagem. Pagar uma conta totalmente
+  coberta **não altera** o "Livre pra usar".
+- Operações de pagamento **rejeitam** entradas inválidas (valor ≤ 0 ou não inteiro,
+  conta inexistente/não-pagável/já quitada, valor acima do pendente, vínculo inválido)
+  e **nunca** aplicam mudança parcial de estado (`registrarPagamento` → resultado
+  `{ ok, estado }` | `{ ok:false, codigo, erro }`).
+
+**Validação de fronteira.** Dados externos passam por `validarEstadoFinanceiro`
+antes de entrar nas operações: centavos inteiros, vínculos (`reservaId`) existentes,
+saldos não-negativos, coerência entre `status` e `valorPago`, ids únicos.
+
 ### 2.5 Exemplo trabalhado (usado como dado-exemplo nas telas)
 
 | Item | Valor |
@@ -180,6 +200,31 @@ uma conta de imposto de R$ 800, `comprometido` = 800 + 0 = **800** (não 1.600).
 
 CSV no MVP (abre no Excel/Sheets, separador `;`, UTF-8 com BOM, decimais pt-BR).
 PDF fica para depois.
+
+### 2.8 Operações e integridade do estado
+
+O motor financeiro expõe uma **API pública única e segura**. Toda operação que
+pode receber dados inválidos é **atômica** e retorna um resultado tipado
+`{ ok: true, estado } | { ok: false, codigo, erro }` — em caso de erro, **nada**
+no estado é alterado.
+
+- **Reservas:** uma só API — `guardarNaReserva` e `resgatarDaReserva` (validadas,
+  retornam resultado). Rejeitam valor inválido, reserva inexistente e resgate acima
+  do saldo guardado; **nunca** deixam o envelope negativo. (Não há segunda API
+  "leniente".)
+- **Validação na fronteira:** dados externos entram no domínio **somente** por
+  `carregarEstadoFinanceiro(dados)`, que valida e **lança** em caso de inconsistência
+  (centavos inteiros, `reservaId` existente, saldos não-negativos, coerência
+  `status`↔`valorPago`, ids únicos). A validação é **aplicada**, não apenas
+  disponível. `validarEstadoFinanceiro` é a variante que retorna resultado.
+- **Exclusão:** `excluirMovimentacao` **recusa** apagar movimentações que já
+  afetaram o saldo real — entrada recebida ou conta com qualquer `valorPago` — para
+  não apagar dinheiro que já entrou/saiu. Só movimentações sem efeito (entrada
+  prevista, conta pendente sem pagamento) podem ser excluídas.
+- **Edição:** `editarMovimentacao` **preserva** `valorPago` e o histórico; não
+  permite reduzir `valor` abaixo do já pago; recalcula `status` a partir de
+  `valorPago` vs `valor` (coerência); e **bloqueia** trocar a reserva vinculada de
+  uma conta que já recebeu pagamento.
 
 ---
 

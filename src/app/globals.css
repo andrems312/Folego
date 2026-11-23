@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   Tokens do Fôlego (DESIGN.md §4 e §17)
+   Três estados de tema: :root (claro) · prefers-color-scheme (escuro, sistema)
+   · [data-theme] (escolha explícita do usuário).
+   ========================================================================== */
+:root {
+  /* Tipografia */
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-text: "Spectral", Georgia, "Times New Roman", serif;
+  --font-ui: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Superfícies */
+  --paper: #f4f0e6;
+  --surface: #fbf9f2;
+  --surface-2: #ece7d9;
+
+  /* Tinta / texto */
+  --ink: #1a1a17;
+  --ink-2: #4a4842;
+  --ink-3: #6e6b61;
+  --ink-inverse: #f7f4ec;
+
+  /* Filetes */
+  --line: #dad4c4;
+  --line-2: #c4bca6;
+
+  /* Semântica do dinheiro */
+  --credit: #2f6b4f;
+  --debit: #9e2b25;
+  --committed: #8a8778;
+  --forecast: #2e5e8f;
+
+  /* Status */
+  --ok: #2f6b4f;
+  --attention: #9a6300;
+  --risk: #bc2e2e;
+  --ok-bg: #e7eee6;
+  --attention-bg: #f3ead4;
+  --risk-bg: #f4e1dd;
+
+  /* Categorias de relatório (validadas por script) */
+  --cat-1: #b3412c;
+  --cat-2: #0e7d50;
+  --cat-3: #2f5ea0;
+  --cat-4: #9e6b00;
+  --cat-5: #7a4e86;
+  --cat-6: #4e7a2e;
+
+  /* Utilidades */
+  --focus: #2e5e8f;
+  --overlay: rgba(26, 26, 23, 0.45);
+  --shadow-overlay: 0 6px 24px -8px rgba(26, 26, 23, 0.28),
+    0 1px 0 rgba(26, 26, 23, 0.06);
+
+  color-scheme: light;
+}
+
+/* Tema escuro — "razão noturno" */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #16150f;
+    --surface: #201e16;
+    --surface-2: #100f0a;
+    --ink: #ece7d6;
+    --ink-2: #b8b2a0;
+    --ink-3: #8a8574;
+    --ink-inverse: #17160f;
+    --line: #35322a;
+    --line-2: #4a463b;
+    --credit: #6fb58a;
+    --debit: #e06a5e;
+    --committed: #9a978a;
+    --forecast: #7fa8d8;
+    --ok: #6fb58a;
+    --attention: #d9a441;
+    --risk: #e5604d;
+    --ok-bg: #1e2a20;
+    --attention-bg: #2c2614;
+    --risk-bg: #2e1a17;
+    --cat-1: #d9705c;
+    --cat-2: #3fa886;
+    --cat-3: #5a8fd6;
+    --cat-4: #b88a2e;
+    --cat-5: #b07bc8;
+    --cat-6: #78a24f;
+    --focus: #7fa8d8;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --shadow-overlay: 0 8px 28px -8px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #16150f;
+  --surface: #201e16;
+  --surface-2: #100f0a;
+  --ink: #ece7d6;
+  --ink-2: #b8b2a0;
+  --ink-3: #8a8574;
+  --ink-inverse: #17160f;
+  --line: #35322a;
+  --line-2: #4a463b;
+  --credit: #6fb58a;
+  --debit: #e06a5e;
+  --committed: #9a978a;
+  --forecast: #7fa8d8;
+  --ok: #6fb58a;
+  --attention: #d9a441;
+  --risk: #e5604d;
+  --ok-bg: #1e2a20;
+  --attention-bg: #2c2614;
+  --risk-bg: #2e1a17;
+  --cat-1: #d9705c;
+  --cat-2: #3fa886;
+  --cat-3: #5a8fd6;
+  --cat-4: #b88a2e;
+  --cat-5: #b07bc8;
+  --cat-6: #78a24f;
+  --focus: #7fa8d8;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-overlay: 0 8px 28px -8px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--forecast) 24%, transparent);
+}
+
+/* ==========================================================================
+   Utilidades do sistema
+   ========================================================================== */
+.tabular {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Comprometido: hachura 45° (DESIGN.md §3) — reforço não-cromático. */
+.pattern-committed {
+  background-color: color-mix(in srgb, var(--committed) 14%, transparent);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--committed) 0,
+    var(--committed) 1.4px,
+    transparent 1.4px,
+    transparent 6px
+  );
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
