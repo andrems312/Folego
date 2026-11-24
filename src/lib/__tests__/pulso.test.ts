@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { projetarCaixa } from "@/domain";
 import type { EstadoFinanceiro } from "@/domain";
-import { recortarHorizonte } from "../pulso";
+import { recortarHorizonte, resumirPulso } from "../pulso";
 
 const HOJE = "2026-03-01";
 
@@ -131,5 +131,72 @@ describe("recortarHorizonte", () => {
       expect(recorte.dias).toEqual(direto.dias);
       expect(recorte.primeiroDiaDeRisco).toEqual(direto.primeiroDiaDeRisco);
     }
+  });
+});
+
+describe("resumirPulso", () => {
+  it("agrega os indicadores de um período sem risco", () => {
+    const r = resumirPulso(recortarHorizonte(projecao30(estadoBase), 15));
+    expect(r.saldoAtual).toBe(428_000);
+    expect(r.menorConfirmado).toBe(313_000); // após a saída de 115.000
+    expect(r.diaMenorConfirmado.data).toBe("2026-03-06"); // primeiro dia no mínimo
+    expect(r.confirmadoFinal).toBe(313_000);
+    expect(r.projetadoFinal).toBe(553_000); // 313.000 + 240.000 previsto
+    expect(r.aEntrar).toBe(240_000);
+    expect(r.totalAPagar).toBe(115_000);
+    expect(r.totalPrevisto).toBe(240_000);
+    expect(r.emRisco).toBe(false);
+    expect(r.primeiroDiaDeRisco).toBeNull();
+    expect(r.horizonteDias).toBe(15);
+  });
+
+  it("aEntrar é igual à diferença entre projetado e confirmado finais", () => {
+    const r = resumirPulso(recortarHorizonte(projecao30(estadoBase), 30));
+    expect(r.aEntrar).toBe(r.projetadoFinal - r.confirmadoFinal);
+    expect(r.aEntrar).toBe(r.totalPrevisto);
+  });
+
+  it("reflete risco e o menor saldo quando o caixa aperta", () => {
+    const estado: EstadoFinanceiro = {
+      config: { saldoAbertura: 200_000, margemSeguranca: 100_000 },
+      reservas: [],
+      movimentacoes: [
+        {
+          id: "aluguel",
+          tipo: "saida",
+          valor: 150_000,
+          data: "2026-03-06", // offset 5
+          categoriaId: "materiais",
+          status: "pendente",
+        },
+      ],
+    };
+    const r = resumirPulso(recortarHorizonte(projecao30(estado), 15));
+    expect(r.emRisco).toBe(true);
+    expect(r.primeiroDiaDeRisco?.data).toBe("2026-03-06");
+    expect(r.menorConfirmado).toBe(50_000); // 200.000 − 150.000
+    expect(r.totalAPagar).toBe(150_000);
+    expect(r.totalPrevisto).toBe(0);
+    expect(r.aEntrar).toBe(0);
+  });
+
+  it("horizonte menor pode não conter o risco presente no maior", () => {
+    const estado: EstadoFinanceiro = {
+      config: { saldoAbertura: 200_000, margemSeguranca: 100_000 },
+      reservas: [],
+      movimentacoes: [
+        {
+          id: "aluguel",
+          tipo: "saida",
+          valor: 150_000,
+          data: "2026-03-11", // offset 10
+          categoriaId: "materiais",
+          status: "pendente",
+        },
+      ],
+    };
+    const p30 = projecao30(estado);
+    expect(resumirPulso(recortarHorizonte(p30, 7)).emRisco).toBe(false);
+    expect(resumirPulso(recortarHorizonte(p30, 15)).emRisco).toBe(true);
   });
 });

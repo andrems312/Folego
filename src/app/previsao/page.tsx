@@ -1,11 +1,16 @@
-import { PlaceholderTela } from "@/components/ui/placeholder-tela";
+import { ResumoPulso } from "@/components/pulso/resumo-pulso";
 
+/**
+ * Previsão — primeira versão funcional do Pulso do Caixa (Etapa 2): resumo textual
+ * e indicadores, com alternância de horizonte (7/15/30). O gráfico chega na Etapa 3.
+ */
 export default function PrevisaoPage() {
   return (
-    <PlaceholderTela
-      icone="previsao"
-      titulo="Previsão"
-      descricao="Os próximos 7, 15 e 30 dias, com o que é certo separado do que ainda vai entrar."
-    />
+    <div className="space-y-6">
+      <p className="font-ui text-xs uppercase tracking-[0.12em] text-ink-3">
+        Previsão
+      </p>
+      <ResumoPulso />
+    </div>
   );
 }
