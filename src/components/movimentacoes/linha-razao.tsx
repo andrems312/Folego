@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { afetouSaldoReal, formatBRL } from "@/domain";
+import { formatBRL } from "@/domain";
 import type { FormaPagamento, Movimentacao } from "@/domain";
 import {
   descreverMovimentacao,
@@ -20,35 +19,19 @@ const FORMA_PAGAMENTO_LABEL: Record<FormaPagamento, string> = {
  * Linha de livro-caixa (apresentacional). Cor crédito/débito composta aqui (não
  * no `Money`), status e forma de pagamento conforme os dados disponíveis.
  *
- * Ações opcionais (`onReceber`/`onPagar`/`onExcluir`/`onEditar`): quando fornecidas
- * pelo contexto (listagem, que já é cliente), a linha oferece "Receber" em entradas
- * previstas, "Pagar" em contas com saldo pendente (a pagar ou parcial), "Excluir"
- * apenas em movimentações que ainda NÃO afetaram o saldo real — a elegibilidade usa
- * o helper do domínio `afetouSaldoReal` (mesma fonte de verdade de
- * `excluirMovimentacao`) — e "Editar" em qualquer movimentação (o bloqueio do valor
- * para realizadas é tratado dentro da folha de edição). Sem as props, a linha
- * permanece read-only. A decisão de validade continua no domínio; aqui só a oferta.
+ * Quando o contexto fornece `onAbrir` (listagem, que já é cliente), a linha inteira
+ * vira um acionador acessível que abre a folha de detalhe — onde ficam as ações
+ * (Receber/Pagar/Editar/Excluir). Sem a prop, a linha permanece read-only.
  */
 export function LinhaRazao({
   m,
-  onReceber,
-  onPagar,
-  onExcluir,
-  onEditar,
+  onAbrir,
 }: {
   m: Movimentacao;
-  onReceber?: (m: Movimentacao) => void;
-  onPagar?: (m: Movimentacao) => void;
-  onExcluir?: (m: Movimentacao) => void;
-  onEditar?: (m: Movimentacao) => void;
+  onAbrir?: (m: Movimentacao) => void;
 }) {
   const a = descreverMovimentacao(m);
   const corValor = a.cor === "credit" ? "text-credit" : "text-debit";
-  const podeReceber = Boolean(onReceber) && a.status === "previsto";
-  const podePagar =
-    Boolean(onPagar) && (a.status === "a-pagar" || a.status === "parcial");
-  const podeExcluir = Boolean(onExcluir) && !afetouSaldoReal(m);
-  const podeEditar = Boolean(onEditar);
 
   const meta = [
     nomeCategoria(m.categoriaId),
@@ -57,72 +40,47 @@ export function LinhaRazao({
     .filter(Boolean)
     .join(" · ");
 
-  return (
-    <li className="flex items-baseline justify-between gap-4 border-b border-line py-3 last:border-b-0">
-      <div className="min-w-0">
-        <p className="truncate font-ui text-ink">{m.descricao ?? a.tipoLabel}</p>
-        <p className="mt-0.5 truncate font-ui text-xs text-ink-3">
+  const conteudo = (
+    <>
+      <span className="block min-w-0">
+        <span className="block truncate font-ui text-ink">
+          {m.descricao ?? a.tipoLabel}
+        </span>
+        <span className="mt-0.5 block truncate font-ui text-xs text-ink-3">
           <span className="text-ink-2">{a.tipoLabel}</span>
           {meta && ` · ${meta}`}
-        </p>
-      </div>
+        </span>
+      </span>
 
-      <div className="shrink-0 text-right">
-        <p className={cn("tabular font-text", corValor)}>
+      <span className="block shrink-0 text-right">
+        <span className={cn("block tabular font-text", corValor)}>
           {a.sinal} {formatBRL(m.valor)}
-        </p>
-        <p className="mt-0.5">
+        </span>
+        <span className="mt-0.5 block">
           <StatusTag apresentacao={a} />
-        </p>
-        {podeReceber && (
-          <p className="mt-2">
-            <Button
-              tamanho="sm"
-              variante="secondary"
-              onClick={() => onReceber!(m)}
-              aria-label={`Receber entrada: ${m.descricao ?? "entrada prevista"}`}
-            >
-              Receber
-            </Button>
-          </p>
-        )}
-        {podePagar && (
-          <p className="mt-2">
-            <Button
-              tamanho="sm"
-              variante="secondary"
-              onClick={() => onPagar!(m)}
-              aria-label={`Registrar pagamento: ${m.descricao ?? "conta a pagar"}`}
-            >
-              Pagar
-            </Button>
-          </p>
-        )}
-        {podeEditar && (
-          <p className="mt-2">
-            <Button
-              tamanho="sm"
-              variante="ghost"
-              onClick={() => onEditar!(m)}
-              aria-label={`Editar lançamento: ${m.descricao ?? a.tipoLabel}`}
-            >
-              Editar
-            </Button>
-          </p>
-        )}
-        {podeExcluir && (
-          <p className="mt-2">
-            <Button
-              tamanho="sm"
-              variante="ghost"
-              onClick={() => onExcluir!(m)}
-              aria-label={`Excluir lançamento: ${m.descricao ?? a.tipoLabel}`}
-            >
-              Excluir
-            </Button>
-          </p>
-        )}
-      </div>
+        </span>
+      </span>
+    </>
+  );
+
+  if (onAbrir) {
+    return (
+      <li className="border-b border-line last:border-b-0">
+        <button
+          type="button"
+          onClick={() => onAbrir(m)}
+          aria-label={`Abrir detalhes: ${m.descricao ?? a.tipoLabel}`}
+          className="flex w-full items-baseline justify-between gap-4 rounded-sm py-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          {conteudo}
+        </button>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-baseline justify-between gap-4 border-b border-line py-3 last:border-b-0">
+      {conteudo}
     </li>
   );
 }

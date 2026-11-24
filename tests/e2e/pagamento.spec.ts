@@ -1,21 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Etapa 3 — Pagamentos parciais e integrais.
- *
- * Seed de demonstração (src/demo/fixtures.ts). Conta "Material — fornecedor"
- * (m4): saída pendente R$ 1.150,00, sem reserva. saldoReal inicial = R$ 4.280,00.
- *  - Parcial R$ 400,00  -> saldoReal 3.880,00; m4 "Parcial · falta R$ 750,00".
- *  - Integral (Quitar tudo) -> saldoReal 3.130,00; m4 "Pago".
- *  - "Livre pra usar" é invariante ao pagar conta descoberta (anti-dupla-contagem).
- * Cada teste roda em contexto isolado (localStorage próprio), então o seed é
- * recriado a cada teste; o reload dentro do teste preserva o estado persistido.
+ * Etapa 3 (pagamentos) — agora acionado pela folha de detalhe (Etapa D).
+ * Seed: conta "Material — fornecedor" (m4), saída pendente R$ 1.150,00, sem reserva.
  */
 
-const CONTA = "Material"; // m4 — saída a pagar R$ 1.150,00
-const ENTRADA = "Instalação elétrica"; // m1 — entrada recebida (não pagável)
-const SAIDA_PAGA = "Combustível"; // m2 — saída já paga
-const RETIRADA = "Retirada pessoal"; // m3 — retirada já realizada
+const CONTA = "Material"; // m4
+const ENTRADA = "Instalação elétrica"; // m1
+const SAIDA_PAGA = "Combustível"; // m2
 
 function naContaHoje(page: Page) {
   return page
@@ -29,76 +21,76 @@ function heroLivre(page: Page) {
     .locator("xpath=following-sibling::p[1]");
 }
 
-test("pagamento integral (Quitar tudo): conta vira 'Pago' e some o botão", async ({
+async function abrirDetalhe(page: Page, texto: string) {
+  await page
+    .locator("li", { hasText: texto })
+    .getByRole("button", { name: /Abrir detalhes/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+async function abrirPagamento(page: Page, texto: string) {
+  const detalhe = await abrirDetalhe(page, texto);
+  await detalhe.getByRole("button", { name: "Pagar" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test("pagamento integral (Quitar tudo): conta vira 'Pago' e deixa de oferecer Pagar", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: CONTA });
-  await expect(linha.getByText("A pagar", { exact: true })).toBeVisible();
-
-  await linha.getByRole("button", { name: /Registrar pagamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("Falta pagar")).toBeVisible();
-
-  await dialog.getByRole("button", { name: "Quitar tudo" }).click();
-  await dialog.getByRole("button", { name: "Registrar pagamento" }).click();
+  const pg = await abrirPagamento(page, CONTA);
+  await expect(pg.getByText("Falta pagar")).toBeVisible();
+  await pg.getByRole("button", { name: "Quitar tudo" }).click();
+  await pg.getByRole("button", { name: "Registrar pagamento" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("Conta quitada.")).toBeVisible();
 
-  // Reativo na lista: "Pago" e sem ação de pagamento.
+  const linha = page.locator("li", { hasText: CONTA });
   await expect(linha.getByText("Pago", { exact: true })).toBeVisible();
-  await expect(
-    linha.getByRole("button", { name: /Registrar pagamento/ }),
-  ).toHaveCount(0);
 
-  // Reativo no resumo (sem reload): saldo real 4.280,00 -> 3.130,00.
+  // O detalhe dessa conta já não oferece "Pagar".
+  const d = await abrirDetalhe(page, CONTA);
+  await expect(d.getByRole("button", { name: "Pagar" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
   await page.getByRole("link", { name: "Visão geral" }).first().click();
   await expect(naContaHoje(page)).toHaveText(/3\.130,00/);
-
-  // Persiste após recarregar.
   await page.reload();
   await expect(naContaHoje(page)).toHaveText(/3\.130,00/);
 });
 
-test("pagamento parcial: conta segue pendente, mostra pago e o que falta", async ({
+test("pagamento parcial: segue pendente e mostra 'Já pago' ao reabrir", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: CONTA });
-  await expect(linha.getByText("A pagar", { exact: true })).toBeVisible();
-
-  await linha.getByRole("button", { name: /Registrar pagamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Valor do pagamento").fill("400,00");
-  await dialog.getByRole("button", { name: "Registrar pagamento" }).click();
+  const pg = await abrirPagamento(page, CONTA);
+  await pg.getByLabel("Valor do pagamento").fill("400,00");
+  await pg.getByRole("button", { name: "Registrar pagamento" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("Pagamento registrado.")).toBeVisible();
 
-  // Continua pendente, agora parcial com o restante exibido.
+  const linha = page.locator("li", { hasText: CONTA });
   await expect(linha.getByText(/Parcial · falta/)).toBeVisible();
   await expect(linha.getByText(/750,00/)).toBeVisible();
-  // O botão Pagar continua disponível.
-  await expect(
-    linha.getByRole("button", { name: /Registrar pagamento/ }),
-  ).toBeVisible();
 
-  // Reabrindo, a folha mostra "Já pago" e o novo "Falta pagar".
-  await linha.getByRole("button", { name: /Registrar pagamento/ }).click();
-  const dialog2 = page.getByRole("dialog");
-  await expect(dialog2.getByText("Já pago")).toBeVisible();
-  await expect(dialog2.getByText(/400,00/)).toBeVisible();
-  await expect(dialog2.getByText(/750,00/)).toBeVisible();
+  // Reabrir o pagamento mostra "Já pago" e o novo "Falta pagar".
+  const pg2 = await abrirPagamento(page, CONTA);
+  await expect(pg2.getByText("Já pago")).toBeVisible();
+  await expect(pg2.getByText(/400,00/)).toBeVisible();
+  await expect(pg2.getByText(/750,00/)).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // Reativo no resumo: saldo real 4.280,00 -> 3.880,00; livre invariante.
   await page.getByRole("link", { name: "Visão geral" }).first().click();
   await expect(naContaHoje(page)).toHaveText(/3\.880,00/);
   await expect(heroLivre(page)).toHaveText(/1\.330,00/);
-
-  // Persiste após recarregar.
   await page.reload();
   await expect(naContaHoje(page)).toHaveText(/3\.880,00/);
 });
@@ -107,62 +99,44 @@ test("pagar acima do pendente é barrado; folha segue aberta e o estado não mud
   page,
 }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: CONTA });
+  const pg = await abrirPagamento(page, CONTA);
+  await pg.getByLabel("Valor do pagamento").fill("2.000,00");
+  await pg.getByRole("button", { name: "Registrar pagamento" }).click();
 
-  await linha.getByRole("button", { name: /Registrar pagamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Valor do pagamento").fill("2.000,00");
-  await dialog.getByRole("button", { name: "Registrar pagamento" }).click();
+  await expect(pg).toBeVisible();
+  await expect(pg.getByText(/maior do que falta pagar/i)).toBeVisible();
 
-  // Erro exibido dentro da folha, que permanece aberta.
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/maior do que falta pagar/i)).toBeVisible();
-
-  // Estado inalterado: fecha e a conta continua "A pagar".
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(linha.getByText("A pagar", { exact: true })).toBeVisible();
-
-  // Saldo real intacto (4.280,00).
-  await page.getByRole("link", { name: "Visão geral" }).first().click();
-  await expect(naContaHoje(page)).toHaveText(/4\.280,00/);
+  await expect(
+    page.locator("li", { hasText: CONTA }).getByText("A pagar", { exact: true }),
+  ).toBeVisible();
 });
 
-test("não há botão 'Pagar' em contas quitadas nem em movimentações não pagáveis", async ({
+test("o detalhe não oferece 'Pagar' para entrada nem para saída já paga", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
 
-  // Entrada não é pagável.
-  await expect(
-    page
-      .locator("li", { hasText: ENTRADA })
-      .getByRole("button", { name: /Registrar pagamento/ }),
-  ).toHaveCount(0);
+  const d1 = await abrirDetalhe(page, ENTRADA);
+  await expect(d1.getByRole("button", { name: "Pagar" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // Saída já paga.
-  const saidaPaga = page.locator("li", { hasText: SAIDA_PAGA });
-  await expect(saidaPaga.getByText("Pago", { exact: true })).toBeVisible();
-  await expect(
-    saidaPaga.getByRole("button", { name: /Registrar pagamento/ }),
-  ).toHaveCount(0);
-
-  // Retirada já realizada.
-  await expect(
-    page
-      .locator("li", { hasText: RETIRADA })
-      .getByRole("button", { name: /Registrar pagamento/ }),
-  ).toHaveCount(0);
+  const d2 = await abrirDetalhe(page, SAIDA_PAGA);
+  await expect(d2.getByText("Pago", { exact: true })).toBeVisible();
+  await expect(d2.getByRole("button", { name: "Pagar" })).toHaveCount(0);
 });
 
-test("foco: abre a folha de pagamento e retorna ao gatilho ao fechar (Escape)", async ({
+test("foco: abre o pagamento pelo detalhe e retorna à linha ao fechar (Escape)", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
   const gatilho = page
     .locator("li", { hasText: CONTA })
-    .getByRole("button", { name: /Registrar pagamento/ });
+    .getByRole("button", { name: /Abrir detalhes/ });
   await gatilho.click();
+  await page.getByRole("dialog").getByRole("button", { name: "Pagar" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
 
   const focoNoDialogo = await page.evaluate(() => {

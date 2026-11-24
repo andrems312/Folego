@@ -1,14 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Entrega 2.5 / Etapa C — Edição de movimentações.
- *
- * Seed de demonstração (src/demo/fixtures.ts):
- *  - m1 "Instalação elétrica": entrada recebida R$ 2.000,00 (totalmente realizada
- *        -> valor bloqueado; informações não-financeiras editáveis).
- *  - m4 "Material — fornecedor": conta pendente R$ 1.150,00 (valor editável).
- *        Reduzir para R$ 1.000,00 -> "Livre pra usar" 1.330,00 -> 1.480,00.
- * Cada teste roda em contexto isolado; o reload preserva o estado persistido.
+ * Etapa C (edição) — agora acionada pela folha de detalhe (Etapa D).
+ * Seed: m1 "Instalação elétrica" (recebida — valor bloqueado); m4 "Material"
+ * (pendente — valor editável; reduzir p/ R$ 1.000,00 leva o livre a R$ 1.480,00).
  */
 
 const CHAVE = "folego:estado:v1";
@@ -42,32 +37,44 @@ function naContaHoje(page: Page) {
     .locator("xpath=following-sibling::dd");
 }
 
+async function abrirDetalhe(page: Page, texto: string) {
+  await page
+    .locator("li", { hasText: texto })
+    .getByRole("button", { name: /Abrir detalhes/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+async function abrirEdicao(page: Page, texto: string) {
+  const detalhe = await abrirDetalhe(page, texto);
+  await detalhe.getByRole("button", { name: "Editar" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
 test("edita informações não-financeiras de uma realizada; valor fica bloqueado", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: REALIZADA });
+  const ed = await abrirEdicao(page, REALIZADA);
 
-  await linha.getByRole("button", { name: /Editar lançamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
+  await expect(ed.getByText(/não pode ser alterado/i)).toBeVisible();
+  await expect(ed.locator("#valor-edicao")).toHaveCount(0);
 
-  // Valor bloqueado: nota visível e sem campo editável de valor.
-  await expect(dialog.getByText(/não pode ser alterado/i)).toBeVisible();
-  await expect(dialog.locator("#valor-edicao")).toHaveCount(0);
-
-  await dialog.getByLabel("Categoria").selectOption({ value: "ferramentas" });
-  await dialog.getByLabel("Descrição (opcional)").fill("Instalação revisada");
-  await dialog.getByRole("button", { name: "Salvar alterações" }).click();
+  await ed.getByLabel("Categoria").selectOption({ value: "ferramentas" });
+  await ed.getByLabel("Descrição (opcional)").fill("Instalação revisada");
+  await ed.getByRole("button", { name: "Salvar alterações" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("Lançamento atualizado.")).toBeVisible();
 
-  const linhaAtualizada = page.locator("li", { hasText: "Instalação revisada" });
-  await expect(linhaAtualizada).toBeVisible();
-  await expect(linhaAtualizada.getByText(/Ferramentas/)).toBeVisible();
+  const linha = page.locator("li", { hasText: "Instalação revisada" });
+  await expect(linha).toBeVisible();
+  await expect(linha.getByText(/Ferramentas/)).toBeVisible();
 
-  // Saldo real inalterado (nenhuma mudança de valor) e persistência.
   await page.getByRole("link", { name: "Visão geral" }).first().click();
   await expect(naContaHoje(page)).toHaveText(/4\.280,00/);
   await page.reload();
@@ -79,21 +86,17 @@ test("edita o valor de uma conta pendente; resumo reage e persiste", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: CONTA });
-  await expect(linha.getByText("A pagar", { exact: true })).toBeVisible();
-
-  await linha.getByRole("button", { name: /Editar lançamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Valor").fill("1.000,00");
-  await dialog.getByRole("button", { name: "Salvar alterações" }).click();
+  const ed = await abrirEdicao(page, CONTA);
+  await ed.getByLabel("Valor").fill("1.000,00");
+  await ed.getByRole("button", { name: "Salvar alterações" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("Lançamento atualizado.")).toBeVisible();
 
+  const linha = page.locator("li", { hasText: CONTA });
   await expect(linha.getByText(/1\.000,00/)).toBeVisible();
   await expect(linha.getByText("A pagar", { exact: true })).toBeVisible();
 
-  // Reduzir o pendente libera comprometido: "Livre pra usar" 1.330 -> 1.480.
   await page.getByRole("link", { name: "Visão geral" }).first().click();
   await expect(heroLivre(page)).toHaveText(/1\.480,00/);
   await page.reload();
@@ -114,39 +117,38 @@ test("editar valor abaixo do já pago é barrado; folha aberta e estado intacto"
         data: "2026-03-10",
         categoriaId: "materiais",
         status: "pendente",
-        valorPago: 40_000, // já pagou R$ 400,00
+        valorPago: 40_000,
         descricao: "Conta parcial edit",
       },
     ],
   });
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: "Conta parcial edit" });
-  await expect(linha.getByText(/Parcial · falta/)).toBeVisible();
+  const ed = await abrirEdicao(page, "Conta parcial edit");
+  await ed.getByLabel("Valor").fill("300,00");
+  await ed.getByRole("button", { name: "Salvar alterações" }).click();
 
-  await linha.getByRole("button", { name: /Editar lançamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Valor").fill("300,00"); // R$ 300 < R$ 400 já pago
-  await dialog.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(ed).toBeVisible();
+  await expect(ed.getByText(/menor do que você já pagou/i)).toBeVisible();
+  await expect(ed.getByLabel("Valor")).toHaveValue("300,00");
 
-  // Erro dentro da folha, que permanece aberta; valor digitado preservado.
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/menor do que você já pagou/i)).toBeVisible();
-  await expect(dialog.getByLabel("Valor")).toHaveValue("300,00");
-
-  // Estado intacto: fecha e a conta continua com o valor e o pendente originais.
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(linha.getByText(/Parcial · falta R\$\s*600,00/)).toBeVisible();
+  await expect(
+    page
+      .locator("li", { hasText: "Conta parcial edit" })
+      .getByText(/Parcial · falta R\$\s*600,00/),
+  ).toBeVisible();
 });
 
-test("foco: abre a edição e retorna ao gatilho ao fechar (Escape)", async ({
+test("foco: abre a edição pelo detalhe e retorna à linha ao fechar (Escape)", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
   const gatilho = page
     .locator("li", { hasText: PREVISTA })
-    .getByRole("button", { name: /Editar lançamento/ });
+    .getByRole("button", { name: /Abrir detalhes/ });
   await gatilho.click();
+  await page.getByRole("dialog").getByRole("button", { name: "Editar" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
 
   const focoNoDialogo = await page.evaluate(() => {

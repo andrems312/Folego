@@ -1,87 +1,79 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Etapa 2 — Recebimento de entradas previstas.
- *
- * Usa o seed de demonstração (sem addInitScript), cujos valores são canônicos
- * (src/demo/fixtures.ts): livreParaUsar = R$ 1.330,00; a prevista "Serviço
- * concluído — aguardando Pix" = R$ 1.500,00. Ao recebê-la, o saldo real sobe
- * 1.500,00 e o "Livre pra usar" vai a R$ 2.830,00. Sem semear, o estado persiste
- * no reload (um addInitScript re-semearia).
+ * Etapa 2 (recebimento) — agora acionado pela folha de detalhe (Etapa D).
+ * Seed de demonstração: m5 "Serviço concluído" (prevista R$ 1.500,00); ao receber,
+ * "Livre pra usar" vai a R$ 2.830,00.
  */
 
-const PREVISTA = "Serviço concluído"; // m5, entrada prevista R$ 1.500,00
-const JA_RECEBIDA = "Instalação elétrica"; // m1, entrada já realizada
-const CONTA = "Material"; // m4, saída a pagar (fora do escopo desta etapa)
+const PREVISTA = "Serviço concluído"; // m5
+const JA_RECEBIDA = "Instalação elétrica"; // m1
+const CONTA = "Material"; // m4
 
-function heroLivre(page: import("@playwright/test").Page) {
+function heroLivre(page: Page) {
   return page
     .getByText("Livre pra usar", { exact: true })
     .locator("xpath=following-sibling::p[1]");
 }
 
-test("recebe uma entrada prevista: vira 'Recebido' e entra no 'Livre pra usar'", async ({
+async function abrirDetalhe(page: Page, texto: string) {
+  await page
+    .locator("li", { hasText: texto })
+    .getByRole("button", { name: /Abrir detalhes/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test("recebe uma entrada prevista pelo detalhe: vira 'Recebido' e entra no 'Livre pra usar'", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
+  const detalhe = await abrirDetalhe(page, PREVISTA);
+  await detalhe.getByRole("button", { name: "Receber" }).click();
 
-  const linha = page.locator("li", { hasText: PREVISTA });
-  await expect(linha).toBeVisible();
-  await expect(linha.getByText("Previsto", { exact: true })).toBeVisible();
-
-  // Abre a folha de confirmação a partir do botão da linha.
-  await linha.getByRole("button", { name: /Receber entrada/ }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog
-    .getByRole("button", { name: "Confirmar recebimento" })
-    .click();
+  const confirm = page.getByRole("dialog");
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Confirmar recebimento" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("Recebimento confirmado.")).toBeVisible();
 
-  // Reativo na lista (mesma rota, sem reload): agora "Recebido" e sem ação.
+  const linha = page.locator("li", { hasText: PREVISTA });
   await expect(linha.getByText("Recebido", { exact: true })).toBeVisible();
-  await expect(
-    linha.getByRole("button", { name: /Receber entrada/ }),
-  ).toHaveCount(0);
 
-  // Reativo no herói (navegação client-side, sem reload): 1.330,00 -> 2.830,00.
   await page.getByRole("link", { name: "Visão geral" }).first().click();
   await expect(heroLivre(page)).toHaveText(/2\.830,00/);
-
-  // Persiste após recarregar.
   await page.reload();
   await expect(heroLivre(page)).toHaveText(/2\.830,00/);
 });
 
-test("entradas já recebidas e contas não oferecem o botão 'Receber'", async ({
+test("o detalhe não oferece 'Receber' para entradas recebidas nem para contas", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
 
-  const jaRecebida = page.locator("li", { hasText: JA_RECEBIDA });
-  await expect(jaRecebida).toBeVisible();
-  await expect(jaRecebida.getByText("Recebido", { exact: true })).toBeVisible();
-  await expect(
-    jaRecebida.getByRole("button", { name: /Receber/ }),
-  ).toHaveCount(0);
+  const d1 = await abrirDetalhe(page, JA_RECEBIDA);
+  await expect(d1.getByText("Recebido", { exact: true })).toBeVisible();
+  await expect(d1.getByRole("button", { name: "Receber" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // Uma conta a pagar (saída) não é recebível — nenhuma ação nesta etapa.
-  const conta = page.locator("li", { hasText: CONTA });
-  await expect(conta).toBeVisible();
-  await expect(conta.getByRole("button", { name: /Receber/ })).toHaveCount(0);
+  const d2 = await abrirDetalhe(page, CONTA);
+  await expect(d2.getByRole("button", { name: "Receber" })).toHaveCount(0);
+  await expect(d2.getByRole("button", { name: "Pagar" })).toBeVisible();
 });
 
-test("foco: abre a folha de recebimento e retorna ao gatilho ao fechar (Escape)", async ({
+test("foco: abre o recebimento pelo detalhe e retorna à linha ao fechar (Escape)", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-
   const gatilho = page
     .locator("li", { hasText: PREVISTA })
-    .getByRole("button", { name: /Receber entrada/ });
+    .getByRole("button", { name: /Abrir detalhes/ });
   await gatilho.click();
+  await page.getByRole("dialog").getByRole("button", { name: "Receber" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
 
   const focoNoDialogo = await page.evaluate(() => {

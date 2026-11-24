@@ -1,14 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Entrega 2.5 / Etapa B — Exclusão de movimentações.
- *
- * Seed de demonstração (src/demo/fixtures.ts):
- *  - m5/m6: entradas previstas (excluíveis).
- *  - m4: conta pendente R$ 1.150,00 SEM pagamento (excluível). Removê-la libera o
- *        comprometido: "Livre pra usar" 1.330,00 -> 2.480,00 (saldoReal intacto).
- *  - m1 (entrada recebida), m2 (saída paga), m3 (retirada realizada): NÃO excluíveis.
- * Cada teste roda em contexto isolado; o reload dentro do teste preserva o estado.
+ * Etapa B (exclusão) — agora acionada pela folha de detalhe (Etapa D).
+ * Seed de demonstração: m5/m6 previstas (excluíveis); m4 conta pendente sem
+ * pagamento (excluível); m1/m2/m3 com efeito no saldo (não excluíveis).
  */
 
 const CHAVE = "folego:estado:v1";
@@ -38,17 +33,30 @@ function heroLivre(page: Page) {
     .locator("xpath=following-sibling::p[1]");
 }
 
-test("exclui uma entrada prevista: some da lista e persiste", async ({
+async function abrirDetalhe(page: Page, texto: string) {
+  await page
+    .locator("li", { hasText: texto })
+    .getByRole("button", { name: /Abrir detalhes/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+async function abrirExclusao(page: Page, texto: string) {
+  const detalhe = await abrirDetalhe(page, texto);
+  await detalhe.getByRole("button", { name: "Excluir", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test("exclui uma entrada prevista pelo detalhe: some da lista e persiste", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: PREVISTA });
-  await expect(linha).toBeVisible();
-
-  await linha.getByRole("button", { name: /Excluir lançamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Excluir", exact: true }).click();
+  const confirm = await abrirExclusao(page, PREVISTA);
+  await confirm.getByRole("button", { name: "Excluir", exact: true }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("Lançamento excluído.")).toBeVisible();
@@ -62,54 +70,33 @@ test("exclui conta pendente sem pagamento e o resumo reage; persiste", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: CONTA_PENDENTE });
-  await expect(linha.getByText("A pagar", { exact: true })).toBeVisible();
-
-  await linha.getByRole("button", { name: /Excluir lançamento/ }).click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Excluir", exact: true })
-    .click();
+  const confirm = await abrirExclusao(page, CONTA_PENDENTE);
+  await confirm.getByRole("button", { name: "Excluir", exact: true }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator("li", { hasText: CONTA_PENDENTE })).toHaveCount(0);
 
-  // Resumo reativo (sem reload): removê-la libera o comprometido -> 2.480,00.
   await page.getByRole("link", { name: "Visão geral" }).first().click();
   await expect(heroLivre(page)).toHaveText(/2\.480,00/);
-
   await page.reload();
   await expect(heroLivre(page)).toHaveText(/2\.480,00/);
 });
 
-test("a ação Excluir fica oculta para movimentações com efeito no saldo", async ({
+test("o detalhe não oferece 'Excluir' para movimentações com efeito no saldo", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
-
-  // Entrada já recebida.
-  await expect(
-    page
-      .locator("li", { hasText: RECEBIDA })
-      .getByRole("button", { name: /Excluir/ }),
-  ).toHaveCount(0);
-
-  // Saída já paga.
-  await expect(
-    page
-      .locator("li", { hasText: SAIDA_PAGA })
-      .getByRole("button", { name: /Excluir/ }),
-  ).toHaveCount(0);
-
-  // Retirada já realizada.
-  await expect(
-    page
-      .locator("li", { hasText: RETIRADA })
-      .getByRole("button", { name: /Excluir/ }),
-  ).toHaveCount(0);
+  for (const texto of [RECEBIDA, SAIDA_PAGA, RETIRADA]) {
+    const d = await abrirDetalhe(page, texto);
+    await expect(
+      d.getByRole("button", { name: "Excluir", exact: true }),
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
 });
 
-test("a ação Excluir fica oculta para conta parcialmente paga", async ({
+test("o detalhe não oferece 'Excluir' para conta parcialmente paga", async ({
   page,
 }) => {
   await semearEstado(page, {
@@ -123,45 +110,40 @@ test("a ação Excluir fica oculta para conta parcialmente paga", async ({
         data: "2026-03-10",
         categoriaId: "materiais",
         status: "pendente",
-        valorPago: 40_000, // parcialmente paga -> afetou o saldo real
+        valorPago: 40_000,
         descricao: "Conta parcial e2e",
       },
     ],
   });
   await page.goto("/movimentacoes");
-
-  const linha = page.locator("li", { hasText: "Conta parcial e2e" });
-  await expect(linha.getByText(/Parcial · falta/)).toBeVisible();
-  // Não é excluível (tem pagamento), mas segue pagável.
-  await expect(
-    linha.getByRole("button", { name: /Excluir/ }),
-  ).toHaveCount(0);
-  await expect(
-    linha.getByRole("button", { name: /Registrar pagamento/ }),
-  ).toBeVisible();
+  const d = await abrirDetalhe(page, "Conta parcial e2e");
+  await expect(d.getByRole("button", { name: "Excluir", exact: true })).toHaveCount(
+    0,
+  );
+  await expect(d.getByRole("button", { name: "Pagar" })).toBeVisible();
 });
 
 test("cancelar a confirmação não exclui a movimentação", async ({ page }) => {
   await page.goto("/movimentacoes");
-  const linha = page.locator("li", { hasText: PREVISTA });
-
-  await linha.getByRole("button", { name: /Excluir lançamento/ }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Cancelar" }).click();
+  const confirm = await abrirExclusao(page, PREVISTA);
+  await confirm.getByRole("button", { name: "Cancelar" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator("li", { hasText: PREVISTA })).toBeVisible();
 });
 
-test("foco: abre a confirmação e retorna ao gatilho ao fechar (Escape)", async ({
+test("foco: abre a confirmação pelo detalhe e retorna à linha ao fechar (Escape)", async ({
   page,
 }) => {
   await page.goto("/movimentacoes");
   const gatilho = page
     .locator("li", { hasText: PREVISTA })
-    .getByRole("button", { name: /Excluir lançamento/ });
+    .getByRole("button", { name: /Abrir detalhes/ });
   await gatilho.click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Excluir", exact: true })
+    .click();
   await expect(page.getByRole("dialog")).toBeVisible();
 
   const focoNoDialogo = await page.evaluate(() => {

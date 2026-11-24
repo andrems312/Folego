@@ -7,6 +7,7 @@ import { diaDaSemana, formatarDataLonga } from "@/lib/formato-data";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
 import { prepararMovimentacoes, type FiltroTipo } from "@/state/selectors";
 import { FiltroTipoMovimentacao } from "./filtro-tipo";
+import { FolhaDetalhe } from "./folha-detalhe";
 import { FolhaEdicao } from "./folha-edicao";
 import { FolhaExclusao } from "./folha-exclusao";
 import { FolhaPagamento } from "./folha-pagamento";
@@ -22,6 +23,7 @@ import { SemMovimentacoes } from "./sem-movimentacoes";
 export function ListaMovimentacoes() {
   const { status, estado, aviso, recomecar } = useFinanceiro();
   const [filtro, setFiltro] = useState<FiltroTipo>("todas");
+  const [detalhe, setDetalhe] = useState<Movimentacao | null>(null);
   const [recebendo, setRecebendo] = useState<Movimentacao | null>(null);
   const [pagando, setPagando] = useState<Movimentacao | null>(null);
   const [excluindo, setExcluindo] = useState<Movimentacao | null>(null);
@@ -41,10 +43,7 @@ export function ListaMovimentacoes() {
   // Gating: só oferece as ações quando o store está pronto (o domínio é a rede
   // de segurança; aqui apenas não apresentamos os botões fora do estado pronto).
   const pronto = status === "pronto";
-  const onReceber = pronto ? setRecebendo : undefined;
-  const onPagar = pronto ? setPagando : undefined;
-  const onExcluir = pronto ? setExcluindo : undefined;
-  const onEditar = pronto ? setEditando : undefined;
+  const onAbrir = pronto ? setDetalhe : undefined;
 
   return (
     <div className="space-y-6">
@@ -65,14 +64,7 @@ export function ListaMovimentacoes() {
               </h2>
               <ul className="border-t border-line-2">
                 {g.movimentacoes.map((m) => (
-                  <LinhaRazao
-                    key={m.id}
-                    m={m}
-                    onReceber={onReceber}
-                    onPagar={onPagar}
-                    onExcluir={onExcluir}
-                    onEditar={onEditar}
-                  />
+                  <LinhaRazao key={m.id} m={m} onAbrir={onAbrir} />
                 ))}
               </ul>
             </section>
@@ -80,6 +72,26 @@ export function ListaMovimentacoes() {
         </div>
       )}
 
+      <FolhaDetalhe
+        movimentacao={detalhe}
+        onFechar={() => setDetalhe(null)}
+        onReceber={(m) => {
+          setDetalhe(null);
+          setRecebendo(m);
+        }}
+        onPagar={(m) => {
+          setDetalhe(null);
+          setPagando(m);
+        }}
+        onEditar={(m) => {
+          setDetalhe(null);
+          setEditando(m);
+        }}
+        onExcluir={(m) => {
+          setDetalhe(null);
+          setExcluindo(m);
+        }}
+      />
       <FolhaRecebimento
         movimentacao={recebendo}
         onFechar={() => setRecebendo(null)}
