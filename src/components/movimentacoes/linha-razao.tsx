@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { formatBRL } from "@/domain";
 import type { FormaPagamento, Movimentacao } from "@/domain";
 import {
@@ -18,10 +19,22 @@ const FORMA_PAGAMENTO_LABEL: Record<FormaPagamento, string> = {
 /**
  * Linha de livro-caixa (apresentacional). Cor crédito/débito composta aqui (não
  * no `Money`), status e forma de pagamento conforme os dados disponíveis.
+ *
+ * Ação opcional de recebimento (`onReceber`): quando fornecida pelo contexto
+ * (listagem, que já é cliente), a linha oferece "Receber" apenas em entradas
+ * previstas. Sem a prop, a linha permanece puramente read-only, como antes. A
+ * decisão de quando a ação é válida continua no domínio — aqui só a oferta.
  */
-export function LinhaRazao({ m }: { m: Movimentacao }) {
+export function LinhaRazao({
+  m,
+  onReceber,
+}: {
+  m: Movimentacao;
+  onReceber?: (m: Movimentacao) => void;
+}) {
   const a = descreverMovimentacao(m);
   const corValor = a.cor === "credit" ? "text-credit" : "text-debit";
+  const podeReceber = Boolean(onReceber) && a.status === "previsto";
 
   const meta = [
     nomeCategoria(m.categoriaId),
@@ -47,6 +60,18 @@ export function LinhaRazao({ m }: { m: Movimentacao }) {
         <p className="mt-0.5">
           <StatusTag apresentacao={a} />
         </p>
+        {podeReceber && (
+          <p className="mt-2">
+            <Button
+              tamanho="sm"
+              variante="secondary"
+              onClick={() => onReceber!(m)}
+              aria-label={`Receber entrada: ${m.descricao ?? "entrada prevista"}`}
+            >
+              Receber
+            </Button>
+          </p>
+        )}
       </div>
     </li>
   );

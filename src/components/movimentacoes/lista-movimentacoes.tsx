@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { RecuperacaoDados } from "@/components/financeiro/recuperacao-dados";
+import type { Movimentacao } from "@/domain";
 import { diaDaSemana, formatarDataLonga } from "@/lib/formato-data";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
 import { prepararMovimentacoes, type FiltroTipo } from "@/state/selectors";
 import { FiltroTipoMovimentacao } from "./filtro-tipo";
+import { FolhaRecebimento } from "./folha-recebimento";
 import { LinhaRazao } from "./linha-razao";
 import { SemMovimentacoes } from "./sem-movimentacoes";
 
@@ -17,6 +19,7 @@ import { SemMovimentacoes } from "./sem-movimentacoes";
 export function ListaMovimentacoes() {
   const { status, estado, aviso, recomecar } = useFinanceiro();
   const [filtro, setFiltro] = useState<FiltroTipo>("todas");
+  const [recebendo, setRecebendo] = useState<Movimentacao | null>(null);
 
   const grupos = useMemo(
     () => prepararMovimentacoes(estado.movimentacoes, filtro),
@@ -29,6 +32,9 @@ export function ListaMovimentacoes() {
   }
 
   const semNenhuma = estado.movimentacoes.length === 0;
+  // Gating: só oferece a ação quando o store está pronto (o domínio é a rede de
+  // segurança; aqui apenas não apresentamos o botão fora do estado pronto).
+  const onReceber = status === "pronto" ? setRecebendo : undefined;
 
   return (
     <div className="space-y-6">
@@ -49,13 +55,18 @@ export function ListaMovimentacoes() {
               </h2>
               <ul className="border-t border-line-2">
                 {g.movimentacoes.map((m) => (
-                  <LinhaRazao key={m.id} m={m} />
+                  <LinhaRazao key={m.id} m={m} onReceber={onReceber} />
                 ))}
               </ul>
             </section>
           ))}
         </div>
       )}
+
+      <FolhaRecebimento
+        movimentacao={recebendo}
+        onFechar={() => setRecebendo(null)}
+      />
     </div>
   );
 }
