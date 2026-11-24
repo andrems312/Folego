@@ -93,6 +93,22 @@ export function mensagemDeErro(codigo: string): string {
     case "ID_DUPLICADO":
     case "ID_INVALIDO":
       return "Não foi possível salvar. Tente de novo.";
+    // Recebimento e pagamento (Entrega 2.4) — erros reais de `receberEntrada`
+    // e `registrarPagamento`. A regra vive no domínio; aqui só a apresentação.
+    case "MOVIMENTACAO_INEXISTENTE":
+      return "Não encontramos essa movimentação. Atualize a página e tente de novo.";
+    case "MOVIMENTACAO_NAO_RECEBIVEL":
+      return "Só entradas podem ser recebidas. Para contas, registre um pagamento.";
+    case "ENTRADA_JA_RECEBIDA":
+      return "Essa entrada já foi recebida.";
+    case "MOVIMENTACAO_NAO_PAGAVEL":
+      return "Só contas (saída ou retirada) podem ser pagas.";
+    case "CONTA_JA_QUITADA":
+      return "Essa conta já está totalmente paga.";
+    case "VALOR_ACIMA_DO_PENDENTE":
+      return "O valor é maior do que falta pagar nessa conta.";
+    case "VINCULO_INVALIDO":
+      return "A reserva vinculada a essa conta não existe mais. Revise o vínculo e tente de novo.";
     default:
       return "Não foi possível salvar o lançamento. Confira os dados e tente de novo.";
   }

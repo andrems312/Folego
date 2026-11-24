@@ -112,4 +112,32 @@ describe("mensagemDeErro", () => {
   it("código desconhecido cai na mensagem padrão", () => {
     expect(mensagemDeErro("QUALQUER_OUTRO")).toMatch(/não foi possível salvar/i);
   });
+
+  it("mapeia os erros de recebimento e pagamento (Entrega 2.4)", () => {
+    expect(mensagemDeErro("MOVIMENTACAO_INEXISTENTE")).toMatch(/não encontramos/i);
+    expect(mensagemDeErro("MOVIMENTACAO_NAO_RECEBIVEL")).toMatch(
+      /entradas podem ser recebidas/i,
+    );
+    expect(mensagemDeErro("ENTRADA_JA_RECEBIDA")).toMatch(/já foi recebida/i);
+    expect(mensagemDeErro("MOVIMENTACAO_NAO_PAGAVEL")).toMatch(/podem ser pagas/i);
+    expect(mensagemDeErro("CONTA_JA_QUITADA")).toMatch(/totalmente paga/i);
+    expect(mensagemDeErro("VALOR_ACIMA_DO_PENDENTE")).toMatch(/falta pagar/i);
+    expect(mensagemDeErro("VINCULO_INVALIDO")).toMatch(/reserva/i);
+  });
+
+  it("os códigos de recebimento/pagamento não caem na mensagem padrão", () => {
+    const padrao = mensagemDeErro("QUALQUER_OUTRO");
+    const codigos = [
+      "MOVIMENTACAO_INEXISTENTE",
+      "MOVIMENTACAO_NAO_RECEBIVEL",
+      "ENTRADA_JA_RECEBIDA",
+      "MOVIMENTACAO_NAO_PAGAVEL",
+      "CONTA_JA_QUITADA",
+      "VALOR_ACIMA_DO_PENDENTE",
+      "VINCULO_INVALIDO",
+    ];
+    for (const codigo of codigos) {
+      expect(mensagemDeErro(codigo)).not.toBe(padrao);
+    }
+  });
 });
