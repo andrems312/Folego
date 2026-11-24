@@ -1,7 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
+import { RecuperacaoDados } from "@/components/financeiro/recuperacao-dados";
 import { Money } from "@/components/ui/money";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
 import { formatBRL } from "@/domain";
@@ -19,34 +18,7 @@ export function ResumoVisaoGeral() {
   }
 
   if (status === "dados-invalidos") {
-    return (
-      <section
-        className="max-w-reading rounded-md border border-risk bg-risk-bg p-5"
-        role="alert"
-      >
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 text-risk">
-            <Icon name="alerta" size={20} />
-          </span>
-          <div>
-            <h2 className="font-display text-lg text-ink">
-              Encontramos dados salvos com problema
-            </h2>
-            <p className="mt-1 font-text text-sm text-ink-2">
-              {aviso ??
-                "Os dados guardados neste navegador não puderam ser lidos."}{" "}
-              Para sua segurança, não mexemos neles. Você pode recomeçar do zero
-              (isso substitui os dados salvos) ou sair e verificar este navegador.
-            </p>
-            <div className="mt-4">
-              <Button variante="danger" onClick={recomecar}>
-                Recomeçar do zero
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
+    return <RecuperacaoDados aviso={aviso} onRecomecar={recomecar} />;
   }
 
   return (

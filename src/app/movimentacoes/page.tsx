@@ -1,11 +1,16 @@
-import { PlaceholderTela } from "@/components/ui/placeholder-tela";
+import { ListaMovimentacoes } from "@/components/movimentacoes/lista-movimentacoes";
 
+/**
+ * Movimentações — livro-caixa visual, somente consulta. A lista consome o store
+ * financeiro (ver `ListaMovimentacoes`).
+ */
 export default function MovimentacoesPage() {
   return (
-    <PlaceholderTela
-      icone="movimentacoes"
-      titulo="Movimentações"
-      descricao="Registrar e revisar entradas, saídas e retiradas, em linhas de livro-caixa."
-    />
+    <div className="space-y-8">
+      <p className="font-ui text-xs uppercase tracking-[0.12em] text-ink-3">
+        Movimentações
+      </p>
+      <ListaMovimentacoes />
+    </div>
   );
 }

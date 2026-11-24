@@ -21,7 +21,8 @@ test("a navegação leva às outras áreas", async ({ page }) => {
 
   await page.getByRole("link", { name: "Movimentações" }).first().click();
   await expect(page).toHaveURL(/\/movimentacoes$/);
-  await expect(page.getByText("Em construção")).toBeVisible();
+  // A rota agora renderiza a listagem real (filtro de tipo presente).
+  await expect(page.getByRole("button", { name: "Todas" })).toBeVisible();
 });
 
 test("persiste o estado no localStorage (chave versionada) após hidratar", async ({

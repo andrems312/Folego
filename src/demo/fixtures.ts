@@ -22,15 +22,6 @@ function hojeMais(dias: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-export const CATEGORIAS_PADRAO = [
-  { id: "servicos", nome: "Serviços prestados" },
-  { id: "materiais", nome: "Materiais" },
-  { id: "deslocamento", nome: "Deslocamento/combustível" },
-  { id: "ferramentas", nome: "Ferramentas" },
-  { id: "impostos", nome: "Impostos" },
-  { id: "retirada", nome: "Retirada pessoal" },
-] as const;
-
 /** Dados brutos do exemplo (§2.5), validados na carga abaixo. */
 const dadosDemo = {
   config: {
