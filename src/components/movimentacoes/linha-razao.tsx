@@ -20,21 +20,26 @@ const FORMA_PAGAMENTO_LABEL: Record<FormaPagamento, string> = {
  * Linha de livro-caixa (apresentacional). Cor crédito/débito composta aqui (não
  * no `Money`), status e forma de pagamento conforme os dados disponíveis.
  *
- * Ação opcional de recebimento (`onReceber`): quando fornecida pelo contexto
- * (listagem, que já é cliente), a linha oferece "Receber" apenas em entradas
- * previstas. Sem a prop, a linha permanece puramente read-only, como antes. A
- * decisão de quando a ação é válida continua no domínio — aqui só a oferta.
+ * Ações opcionais (`onReceber`/`onPagar`): quando fornecidas pelo contexto
+ * (listagem, que já é cliente), a linha oferece "Receber" em entradas previstas
+ * e "Pagar" em contas com saldo pendente (a pagar ou parcial). Sem as props, a
+ * linha permanece puramente read-only, como antes. A decisão de quando a ação é
+ * válida continua no domínio — aqui só a oferta, derivada do status já calculado.
  */
 export function LinhaRazao({
   m,
   onReceber,
+  onPagar,
 }: {
   m: Movimentacao;
   onReceber?: (m: Movimentacao) => void;
+  onPagar?: (m: Movimentacao) => void;
 }) {
   const a = descreverMovimentacao(m);
   const corValor = a.cor === "credit" ? "text-credit" : "text-debit";
   const podeReceber = Boolean(onReceber) && a.status === "previsto";
+  const podePagar =
+    Boolean(onPagar) && (a.status === "a-pagar" || a.status === "parcial");
 
   const meta = [
     nomeCategoria(m.categoriaId),
@@ -69,6 +74,18 @@ export function LinhaRazao({
               aria-label={`Receber entrada: ${m.descricao ?? "entrada prevista"}`}
             >
               Receber
+            </Button>
+          </p>
+        )}
+        {podePagar && (
+          <p className="mt-2">
+            <Button
+              tamanho="sm"
+              variante="secondary"
+              onClick={() => onPagar!(m)}
+              aria-label={`Registrar pagamento: ${m.descricao ?? "conta a pagar"}`}
+            >
+              Pagar
             </Button>
           </p>
         )}

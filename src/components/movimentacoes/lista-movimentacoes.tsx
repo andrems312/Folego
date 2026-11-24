@@ -7,6 +7,7 @@ import { diaDaSemana, formatarDataLonga } from "@/lib/formato-data";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
 import { prepararMovimentacoes, type FiltroTipo } from "@/state/selectors";
 import { FiltroTipoMovimentacao } from "./filtro-tipo";
+import { FolhaPagamento } from "./folha-pagamento";
 import { FolhaRecebimento } from "./folha-recebimento";
 import { LinhaRazao } from "./linha-razao";
 import { SemMovimentacoes } from "./sem-movimentacoes";
@@ -20,6 +21,7 @@ export function ListaMovimentacoes() {
   const { status, estado, aviso, recomecar } = useFinanceiro();
   const [filtro, setFiltro] = useState<FiltroTipo>("todas");
   const [recebendo, setRecebendo] = useState<Movimentacao | null>(null);
+  const [pagando, setPagando] = useState<Movimentacao | null>(null);
 
   const grupos = useMemo(
     () => prepararMovimentacoes(estado.movimentacoes, filtro),
@@ -32,9 +34,11 @@ export function ListaMovimentacoes() {
   }
 
   const semNenhuma = estado.movimentacoes.length === 0;
-  // Gating: só oferece a ação quando o store está pronto (o domínio é a rede de
-  // segurança; aqui apenas não apresentamos o botão fora do estado pronto).
-  const onReceber = status === "pronto" ? setRecebendo : undefined;
+  // Gating: só oferece as ações quando o store está pronto (o domínio é a rede
+  // de segurança; aqui apenas não apresentamos os botões fora do estado pronto).
+  const pronto = status === "pronto";
+  const onReceber = pronto ? setRecebendo : undefined;
+  const onPagar = pronto ? setPagando : undefined;
 
   return (
     <div className="space-y-6">
@@ -55,7 +59,12 @@ export function ListaMovimentacoes() {
               </h2>
               <ul className="border-t border-line-2">
                 {g.movimentacoes.map((m) => (
-                  <LinhaRazao key={m.id} m={m} onReceber={onReceber} />
+                  <LinhaRazao
+                    key={m.id}
+                    m={m}
+                    onReceber={onReceber}
+                    onPagar={onPagar}
+                  />
                 ))}
               </ul>
             </section>
@@ -66,6 +75,10 @@ export function ListaMovimentacoes() {
       <FolhaRecebimento
         movimentacao={recebendo}
         onFechar={() => setRecebendo(null)}
+      />
+      <FolhaPagamento
+        movimentacao={pagando}
+        onFechar={() => setPagando(null)}
       />
     </div>
   );
