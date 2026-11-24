@@ -140,4 +140,26 @@ describe("mensagemDeErro", () => {
       expect(mensagemDeErro(codigo)).not.toBe(padrao);
     }
   });
+
+  it("mapeia os erros de edição e exclusão (Entrega 2.5)", () => {
+    expect(mensagemDeErro("MOVIMENTACAO_COM_PAGAMENTO")).toMatch(
+      /não pode ser excluída/i,
+    );
+    expect(mensagemDeErro("VALOR_ABAIXO_DO_PAGO")).toMatch(
+      /menor do que você já pagou/i,
+    );
+    expect(mensagemDeErro("VINCULO_BLOQUEADO")).toMatch(/trocar a reserva/i);
+  });
+
+  it("os códigos de edição/exclusão não caem na mensagem padrão", () => {
+    const padrao = mensagemDeErro("QUALQUER_OUTRO");
+    const codigos = [
+      "MOVIMENTACAO_COM_PAGAMENTO",
+      "VALOR_ABAIXO_DO_PAGO",
+      "VINCULO_BLOQUEADO",
+    ];
+    for (const codigo of codigos) {
+      expect(mensagemDeErro(codigo)).not.toBe(padrao);
+    }
+  });
 });

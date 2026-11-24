@@ -109,6 +109,14 @@ export function mensagemDeErro(codigo: string): string {
       return "O valor é maior do que falta pagar nessa conta.";
     case "VINCULO_INVALIDO":
       return "A reserva vinculada a essa conta não existe mais. Revise o vínculo e tente de novo.";
+    // Edição e exclusão (Entrega 2.5) — erros reais de `editarMovimentacao` e
+    // `excluirMovimentacao`. A regra vive no domínio; aqui só a apresentação.
+    case "MOVIMENTACAO_COM_PAGAMENTO":
+      return "Essa movimentação já mexeu no seu saldo e não pode ser excluída. Se precisar, você pode editá-la.";
+    case "VALOR_ABAIXO_DO_PAGO":
+      return "O novo valor não pode ser menor do que você já pagou nessa conta.";
+    case "VINCULO_BLOQUEADO":
+      return "Não dá para trocar a reserva de uma conta que já teve pagamento.";
     default:
       return "Não foi possível salvar o lançamento. Confira os dados e tente de novo.";
   }
