@@ -118,8 +118,10 @@ export function EstadoFinanceiroProvider({
   }, []);
 
   const resumo = useMemo(() => resumoFinanceiro(store.estado), [store.estado]);
+  // Horizonte máximo (30 dias): a série de 30 contém as de 7 e 15, que a UI obtém
+  // por recorte de apresentação (src/lib/pulso.ts), sem recalcular finanças.
   const projecao = useMemo(
-    () => projetarCaixa(store.estado, { horizonteDias: 15 }),
+    () => projetarCaixa(store.estado, { horizonteDias: 30 }),
     [store.estado],
   );
 
