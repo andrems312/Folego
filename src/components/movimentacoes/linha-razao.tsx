@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { formatBRL } from "@/domain";
+import { afetouSaldoReal, formatBRL } from "@/domain";
 import type { FormaPagamento, Movimentacao } from "@/domain";
 import {
   descreverMovimentacao,
@@ -20,26 +20,31 @@ const FORMA_PAGAMENTO_LABEL: Record<FormaPagamento, string> = {
  * Linha de livro-caixa (apresentacional). Cor crédito/débito composta aqui (não
  * no `Money`), status e forma de pagamento conforme os dados disponíveis.
  *
- * Ações opcionais (`onReceber`/`onPagar`): quando fornecidas pelo contexto
- * (listagem, que já é cliente), a linha oferece "Receber" em entradas previstas
- * e "Pagar" em contas com saldo pendente (a pagar ou parcial). Sem as props, a
- * linha permanece puramente read-only, como antes. A decisão de quando a ação é
- * válida continua no domínio — aqui só a oferta, derivada do status já calculado.
+ * Ações opcionais (`onReceber`/`onPagar`/`onExcluir`): quando fornecidas pelo
+ * contexto (listagem, que já é cliente), a linha oferece "Receber" em entradas
+ * previstas, "Pagar" em contas com saldo pendente (a pagar ou parcial) e
+ * "Excluir" apenas em movimentações que ainda NÃO afetaram o saldo real — a
+ * elegibilidade usa o helper do domínio `afetouSaldoReal` (mesma fonte de verdade
+ * de `excluirMovimentacao`), sem reimplementar regra. Sem as props, a linha
+ * permanece read-only. A decisão de validade continua no domínio; aqui só a oferta.
  */
 export function LinhaRazao({
   m,
   onReceber,
   onPagar,
+  onExcluir,
 }: {
   m: Movimentacao;
   onReceber?: (m: Movimentacao) => void;
   onPagar?: (m: Movimentacao) => void;
+  onExcluir?: (m: Movimentacao) => void;
 }) {
   const a = descreverMovimentacao(m);
   const corValor = a.cor === "credit" ? "text-credit" : "text-debit";
   const podeReceber = Boolean(onReceber) && a.status === "previsto";
   const podePagar =
     Boolean(onPagar) && (a.status === "a-pagar" || a.status === "parcial");
+  const podeExcluir = Boolean(onExcluir) && !afetouSaldoReal(m);
 
   const meta = [
     nomeCategoria(m.categoriaId),
@@ -86,6 +91,18 @@ export function LinhaRazao({
               aria-label={`Registrar pagamento: ${m.descricao ?? "conta a pagar"}`}
             >
               Pagar
+            </Button>
+          </p>
+        )}
+        {podeExcluir && (
+          <p className="mt-2">
+            <Button
+              tamanho="sm"
+              variante="ghost"
+              onClick={() => onExcluir!(m)}
+              aria-label={`Excluir lançamento: ${m.descricao ?? a.tipoLabel}`}
+            >
+              Excluir
             </Button>
           </p>
         )}

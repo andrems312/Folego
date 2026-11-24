@@ -7,6 +7,7 @@ import { diaDaSemana, formatarDataLonga } from "@/lib/formato-data";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
 import { prepararMovimentacoes, type FiltroTipo } from "@/state/selectors";
 import { FiltroTipoMovimentacao } from "./filtro-tipo";
+import { FolhaExclusao } from "./folha-exclusao";
 import { FolhaPagamento } from "./folha-pagamento";
 import { FolhaRecebimento } from "./folha-recebimento";
 import { LinhaRazao } from "./linha-razao";
@@ -22,6 +23,7 @@ export function ListaMovimentacoes() {
   const [filtro, setFiltro] = useState<FiltroTipo>("todas");
   const [recebendo, setRecebendo] = useState<Movimentacao | null>(null);
   const [pagando, setPagando] = useState<Movimentacao | null>(null);
+  const [excluindo, setExcluindo] = useState<Movimentacao | null>(null);
 
   const grupos = useMemo(
     () => prepararMovimentacoes(estado.movimentacoes, filtro),
@@ -39,6 +41,7 @@ export function ListaMovimentacoes() {
   const pronto = status === "pronto";
   const onReceber = pronto ? setRecebendo : undefined;
   const onPagar = pronto ? setPagando : undefined;
+  const onExcluir = pronto ? setExcluindo : undefined;
 
   return (
     <div className="space-y-6">
@@ -64,6 +67,7 @@ export function ListaMovimentacoes() {
                     m={m}
                     onReceber={onReceber}
                     onPagar={onPagar}
+                    onExcluir={onExcluir}
                   />
                 ))}
               </ul>
@@ -79,6 +83,10 @@ export function ListaMovimentacoes() {
       <FolhaPagamento
         movimentacao={pagando}
         onFechar={() => setPagando(null)}
+      />
+      <FolhaExclusao
+        movimentacao={excluindo}
+        onFechar={() => setExcluindo(null)}
       />
     </div>
   );
