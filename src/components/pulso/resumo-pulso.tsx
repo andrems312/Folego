@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { RecuperacaoDados } from "@/components/financeiro/recuperacao-dados";
 import { LegendaEstados } from "@/components/ui/legenda-estados";
 import { Money } from "@/components/ui/money";
+import { formatBRL } from "@/domain";
 import type { HorizontePulso } from "@/domain";
 import { formatarDataLonga } from "@/lib/formato-data";
 import { recortarHorizonte, resumirPulso } from "@/lib/pulso";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
+import { GraficoPulso } from "./grafico-pulso";
 import { SeletorHorizonte } from "./seletor-horizonte";
 
 /**
@@ -21,10 +23,11 @@ export function ResumoPulso() {
     useFinanceiro();
   const [horizonte, setHorizonte] = useState<HorizontePulso>(7);
 
-  const indicadores = useMemo(
-    () => resumirPulso(recortarHorizonte(projecao, horizonte)),
+  const recorte = useMemo(
+    () => recortarHorizonte(projecao, horizonte),
     [projecao, horizonte],
   );
+  const indicadores = useMemo(() => resumirPulso(recorte), [recorte]);
 
   if (status === "carregando") return <EsqueletoPulso />;
   if (status === "dados-invalidos") {
@@ -33,6 +36,13 @@ export function ResumoPulso() {
 
   const semMovimentos =
     indicadores.totalAPagar === 0 && indicadores.totalPrevisto === 0;
+
+  // Descrição acessível do gráfico (role="img"): carrega os números-chave para
+  // quem não enxerga o traçado.
+  const descricaoGrafico =
+    indicadores.emRisco && indicadores.primeiroDiaDeRisco
+      ? `Projeção do caixa para ${indicadores.horizonteDias} dias. O saldo garantido parte de ${formatBRL(indicadores.saldoAtual)} e chega ao menor ponto, ${formatBRL(indicadores.menorConfirmado)}, com aperto previsto em ${formatarDataLonga(indicadores.primeiroDiaDeRisco.data)}.`
+      : `Projeção do caixa para ${indicadores.horizonteDias} dias. O saldo garantido parte de ${formatBRL(indicadores.saldoAtual)}, tem menor ponto de ${formatBRL(indicadores.menorConfirmado)} e não cruza a folga de segurança no período.`;
 
   return (
     <section className="space-y-8">
@@ -110,6 +120,13 @@ export function ResumoPulso() {
           </Indicador>
         </dl>
       )}
+
+      <GraficoPulso
+        dias={recorte.dias}
+        horizonteDias={indicadores.horizonteDias}
+        primeiroDiaDeRisco={recorte.primeiroDiaDeRisco}
+        descricao={descricaoGrafico}
+      />
 
       <LegendaEstados />
 

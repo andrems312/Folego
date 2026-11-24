@@ -57,6 +57,22 @@ test("abre /previsao no horizonte padrão de 7 dias, sem risco (seed demo)", asy
   await expect(page.getByText(/não é uma consulta ao seu banco/i)).toBeVisible();
 });
 
+test("o gráfico do Pulso é renderizado com descrição acessível e reage ao horizonte", async ({
+  page,
+}) => {
+  await page.goto("/previsao");
+
+  // SVG acessível (role=img) descrevendo a projeção de 7 dias por padrão.
+  const grafico = page.getByRole("img", { name: /Projeção do caixa para 7 dias/ });
+  await expect(grafico).toBeVisible();
+
+  // Trocar o horizonte atualiza a descrição acessível do gráfico.
+  await page.getByRole("button", { name: "30 dias" }).click();
+  await expect(
+    page.getByRole("img", { name: /Projeção do caixa para 30 dias/ }),
+  ).toBeVisible();
+});
+
 test("alterna entre 7, 15 e 30 dias e os indicadores reagem", async ({ page }) => {
   await page.goto("/previsao");
 
