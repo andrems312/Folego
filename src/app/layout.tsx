@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AppShell } from "@/components/layout/app-shell";
+import { ToastProvider } from "@/components/ui/toast";
 import { EstadoFinanceiroProvider } from "@/state/estado-financeiro-provider";
 import "./globals.css";
 
@@ -41,7 +42,9 @@ export default function RootLayout({
       </head>
       <body>
         <EstadoFinanceiroProvider>
-          <AppShell>{children}</AppShell>
+          <ToastProvider>
+            <AppShell>{children}</AppShell>
+          </ToastProvider>
         </EstadoFinanceiroProvider>
       </body>
     </html>

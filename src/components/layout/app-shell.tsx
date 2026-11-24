@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { FolhaLancamento } from "@/components/movimentacoes/folha-lancamento";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { BottomNav } from "./bottom-nav";
-import { ComingSoonSheet } from "./coming-soon-sheet";
 import { TopNav } from "./top-nav";
 
 /**
@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       <BottomNav onLancar={abrirLancar} />
-      <ComingSoonSheet aberto={lancarAberto} onFechar={() => setLancarAberto(false)} />
+      <FolhaLancamento aberto={lancarAberto} onFechar={() => setLancarAberto(false)} />
     </div>
   );
 }
