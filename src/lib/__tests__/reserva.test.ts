@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Reserva } from "@/domain";
-import { resumoReserva } from "../reserva";
+import { construirCamposReserva, resumoReserva } from "../reserva";
 
 function reserva(extra: Partial<Reserva> = {}): Reserva {
   return { id: "r1", nome: "Impostos", saldoAtual: 0, ...extra };
@@ -47,5 +47,35 @@ describe("resumoReserva", () => {
     expect(resumoReserva(reserva({ saldoAtual: 10_000, alvo: 0 })).temMeta).toBe(
       false,
     );
+  });
+});
+
+describe("construirCamposReserva", () => {
+  it("nome + meta: converte a meta para centavos", () => {
+    const r = construirCamposReserva("  Impostos  ", "1.200,00");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.nome).toBe("Impostos");
+      expect(r.alvo).toBe(120_000);
+    }
+  });
+
+  it("meta vazia vira alvo null (sem meta)", () => {
+    const r = construirCamposReserva("Emergência", "   ");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.alvo).toBeNull();
+  });
+
+  it("nome vazio é rejeitado no campo nome", () => {
+    const r = construirCamposReserva("   ", "100,00");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.campo).toBe("nome");
+  });
+
+  it("meta inválida ou zero é rejeitada no campo meta", () => {
+    expect(construirCamposReserva("X", "abc").ok).toBe(false);
+    const zero = construirCamposReserva("X", "0,00");
+    expect(zero.ok).toBe(false);
+    if (!zero.ok) expect(zero.campo).toBe("meta");
   });
 });

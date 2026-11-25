@@ -6,7 +6,36 @@
  * só computamos percentual/restante para a barra e o texto. `saldoAtual` e `alvo`
  * vêm do domínio; nada é recalculado do caixa.
  */
+import { validarValorMonetario } from "@/domain";
 import type { Centavos, Reserva } from "@/domain";
+
+/**
+ * Mapeamento PURO do formulário de reserva (nome + meta opcional) para o domínio.
+ * Só valida FORMATO (nome não-vazio; meta, se informada, é valor monetário válido).
+ * A regra de negócio fica em `criarReserva`/`editarReserva`. Meta vazia = sem meta.
+ */
+export type ResultadoCamposReserva =
+  | { ok: true; nome: string; alvo: Centavos | null }
+  | { ok: false; campo: "nome" | "meta"; erro: string };
+
+export function construirCamposReserva(
+  nome: string,
+  metaTexto: string,
+): ResultadoCamposReserva {
+  const nomeTrim = nome.trim();
+  if (nomeTrim === "") {
+    return { ok: false, campo: "nome", erro: "Dê um nome para a reserva." };
+  }
+  const metaTrim = metaTexto.trim();
+  if (metaTrim === "") {
+    return { ok: true, nome: nomeTrim, alvo: null };
+  }
+  const meta = validarValorMonetario(metaTrim);
+  if (!meta.ok) {
+    return { ok: false, campo: "meta", erro: meta.erro };
+  }
+  return { ok: true, nome: nomeTrim, alvo: meta.centavos };
+}
 
 export type ResumoReserva =
   | { temMeta: false }

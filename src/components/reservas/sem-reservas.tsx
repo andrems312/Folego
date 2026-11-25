@@ -1,8 +1,10 @@
+import { Button } from "@/components/ui/button";
+
 /**
- * Estado vazio de Reservas — explica a finalidade no tom do Fôlego e prepara
- * visualmente a área para a futura criação, SEM botão que ainda não funciona.
+ * Estado vazio de Reservas — explica a finalidade no tom do Fôlego e oferece a
+ * criação da primeira reserva (quando o store está pronto, via `onCriar`).
  */
-export function SemReservas() {
+export function SemReservas({ onCriar }: { onCriar?: () => void }) {
   return (
     <div className="max-w-reading border-t-2 border-ink pt-6">
       <h2 className="font-display text-2xl text-ink">
@@ -13,9 +15,13 @@ export function SemReservas() {
         finalidade — impostos, uma folga, uma ferramenta — sem tirá-la da conta. O
         que está reservado sai do “Livre pra usar”, mas continua sendo seu.
       </p>
-      <p className="mt-4 font-ui text-sm text-ink-3">
-        Em breve você vai poder criar e abastecer reservas por aqui.
-      </p>
+      {onCriar && (
+        <div className="mt-6">
+          <Button type="button" onClick={onCriar}>
+            Criar primeira reserva
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
