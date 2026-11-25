@@ -15,6 +15,25 @@ test("a Visão geral carrega com a marca e o indicador principal", async ({
   await expect(page.getByText(/1\.330,00/).first()).toBeVisible();
 });
 
+test("a Home mostra o preview do Pulso e leva à previsão completa", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  // Preview do Pulso presente (gráfico acessível de 7 dias).
+  await expect(
+    page.getByRole("img", { name: /Projeção do caixa para 7 dias/ }),
+  ).toBeVisible();
+  // Demo não tem aperto no período.
+  await expect(page.getByText(/Sem apertos à vista nos próximos 7 dias/)).toBeVisible();
+  // O placeholder antigo foi removido.
+  await expect(page.getByText(/chega no próximo checkpoint/i)).toHaveCount(0);
+
+  // O CTA leva à previsão completa.
+  await page.getByRole("link", { name: /Ver previsão/ }).click();
+  await expect(page).toHaveURL(/\/previsao$/);
+});
+
 test("a navegação leva às outras áreas", async ({ page }) => {
   await page.goto("/");
   await page.setViewportSize({ width: 1280, height: 800 });

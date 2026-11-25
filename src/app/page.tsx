@@ -1,10 +1,11 @@
-import { LegendaEstados } from "@/components/ui/legenda-estados";
+import { PulsoPreview } from "@/components/pulso/pulso-preview";
 import { ResumoVisaoGeral } from "@/components/visao-geral/resumo-visao-geral";
 
 /**
  * Visão geral. O número-herói "Livre pra usar" e o detalhamento vêm do store
- * (dados derivados de `resumoFinanceiro`, reativos) via `ResumoVisaoGeral`.
- * O Pulso do Caixa chega em um checkpoint seguinte.
+ * (dados derivados de `resumoFinanceiro`, reativos) via `ResumoVisaoGeral`. A
+ * coluna à direita traz um preview compacto do Pulso (próximos 7 dias), com link
+ * para a previsão completa em /previsao.
  */
 export default function VisaoGeralPage() {
   return (
@@ -15,20 +16,7 @@ export default function VisaoGeralPage() {
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <ResumoVisaoGeral />
-
-        {/* Pulso do Caixa — placeholder honesto */}
-        <section>
-          <p className="font-ui text-xs uppercase tracking-[0.12em] text-ink-3">
-            Pulso do Caixa
-          </p>
-          <div className="mt-3 flex h-48 items-center justify-center rounded-md border border-dashed border-line-2 bg-surface px-6 text-center">
-            <p className="font-text text-sm text-ink-3">
-              O instrumento que mostra seu caixa dia a dia chega no próximo
-              checkpoint.
-            </p>
-          </div>
-          <LegendaEstados className="mt-5" />
-        </section>
+        <PulsoPreview />
       </div>
 
       <p className="max-w-reading font-ui text-xs text-ink-3">
