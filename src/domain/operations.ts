@@ -35,7 +35,10 @@ export type CodigoErro =
   | "ID_DUPLICADO"
   | "CATEGORIA_INVALIDA"
   | "MOVIMENTACAO_NAO_RECEBIVEL"
-  | "ENTRADA_JA_RECEBIDA";
+  | "ENTRADA_JA_RECEBIDA"
+  | "NOME_INVALIDO"
+  | "ALVO_INVALIDO"
+  | "RESERVA_COM_VINCULO";
 
 export type ResultadoOperacao =
   | { ok: true; estado: EstadoFinanceiro }
@@ -221,6 +224,128 @@ export function resgatarDaReserva(
       ...r,
       saldoAtual: r.saldoAtual - valor,
     })),
+  };
+}
+
+/* ======================================================================
+ * Reservas — gestão (criar / editar / excluir) — Entrega 2.7 / Etapa A
+ *
+ * Operações puras, validadas e atômicas, no mesmo padrão `ResultadoOperacao`.
+ * `alvo` é apenas meta de apresentação (não entra em nenhum cálculo financeiro).
+ * `saldoAtual` NÃO é alterado por estas operações (só por guardar/resgatar).
+ * ==================================================================== */
+
+/** Dados para criar uma reserva. O `id` é gerado na borda (operação pura). */
+export interface NovaReserva {
+  id: string;
+  nome: string;
+  /** Meta opcional (centavos). Apenas apresentação; não afeta saldo/projeção. */
+  alvo?: Centavos | null;
+}
+
+/** Campos editáveis de uma reserva (nunca `saldoAtual`, que é derivado de guardar/resgatar). */
+export interface AlteracoesReserva {
+  nome?: string;
+  alvo?: Centavos | null;
+}
+
+/** Valida uma meta opcional: ausente (null) ou inteiro positivo em centavos. */
+function alvoValido(alvo: Centavos | null): boolean {
+  return alvo === null || ePositivoInteiro(alvo);
+}
+
+/**
+ * Cria uma reserva nova (envelope virtual) com `saldoAtual` zerado. Rejeita id
+ * vazio/duplicado, nome vazio e meta inválida. Não altera o estado de entrada.
+ */
+export function criarReserva(
+  e: EstadoFinanceiro,
+  dados: NovaReserva,
+): ResultadoOperacao {
+  if (typeof dados.id !== "string" || dados.id.trim() === "") {
+    return erro("ID_INVALIDO", "A reserva precisa de um id não-vazio.");
+  }
+  if (e.reservas.some((r) => r.id === dados.id)) {
+    return erro("ID_DUPLICADO", "Já existe uma reserva com este id.");
+  }
+  const nome = typeof dados.nome === "string" ? dados.nome.trim() : "";
+  if (nome === "") {
+    return erro("NOME_INVALIDO", "Dê um nome para a reserva.");
+  }
+  const alvo = dados.alvo ?? null;
+  if (!alvoValido(alvo)) {
+    return erro("ALVO_INVALIDO", "A meta precisa ser um valor inteiro positivo em centavos.");
+  }
+
+  const nova: Reserva = { id: dados.id, nome, alvo, saldoAtual: 0 };
+  return { ok: true, estado: { ...e, reservas: [...e.reservas, nova] } };
+}
+
+/**
+ * Edita nome e/ou meta de uma reserva, preservando `saldoAtual` e `id`. Só altera
+ * os campos informados. Rejeita reserva inexistente, nome vazio e meta inválida.
+ */
+export function editarReserva(
+  e: EstadoFinanceiro,
+  reservaId: string,
+  alteracoes: AlteracoesReserva,
+): ResultadoOperacao {
+  const reserva = e.reservas.find((r) => r.id === reservaId);
+  if (!reserva) {
+    return erro("RESERVA_INEXISTENTE", "A reserva informada não existe.");
+  }
+
+  let nome = reserva.nome;
+  if (alteracoes.nome !== undefined) {
+    const candidato = typeof alteracoes.nome === "string" ? alteracoes.nome.trim() : "";
+    if (candidato === "") {
+      return erro("NOME_INVALIDO", "Dê um nome para a reserva.");
+    }
+    nome = candidato;
+  }
+
+  let alvo = reserva.alvo ?? null;
+  if (alteracoes.alvo !== undefined) {
+    if (!alvoValido(alteracoes.alvo)) {
+      return erro("ALVO_INVALIDO", "A meta precisa ser um valor inteiro positivo em centavos.");
+    }
+    alvo = alteracoes.alvo;
+  }
+
+  const atualizada: Reserva = { ...reserva, nome, alvo };
+  return {
+    ok: true,
+    estado: {
+      ...e,
+      reservas: e.reservas.map((r) => (r.id === reservaId ? atualizada : r)),
+    },
+  };
+}
+
+/**
+ * Exclui uma reserva. BLOQUEIA (regra aprovada) quando QUALQUER movimentação ainda
+ * aponta para ela (`reservaId`), independente de estar paga — para não deixar
+ * contas com vínculo órfão. Sem vínculo, remove a reserva: o saldo guardado deixa
+ * de estar comprometido e volta a compor o "Livre pra usar". Não mexe no saldo real
+ * nem cria movimentação fictícia.
+ */
+export function excluirReserva(
+  e: EstadoFinanceiro,
+  reservaId: string,
+): ResultadoOperacao {
+  const reserva = e.reservas.find((r) => r.id === reservaId);
+  if (!reserva) {
+    return erro("RESERVA_INEXISTENTE", "A reserva informada não existe.");
+  }
+  if (e.movimentacoes.some((m) => m.reservaId === reservaId)) {
+    return erro(
+      "RESERVA_COM_VINCULO",
+      "Esta reserva está vinculada a uma conta e não pode ser excluída. Desvincule a conta antes.",
+    );
+  }
+  return {
+    ok: true,
+    estado: { ...e, reservas: e.reservas.filter((r) => r.id !== reservaId) },
   };
 }
 
