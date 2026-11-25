@@ -117,6 +117,18 @@ export function mensagemDeErro(codigo: string): string {
       return "O novo valor não pode ser menor do que você já pagou nessa conta.";
     case "VINCULO_BLOQUEADO":
       return "Não dá para trocar a reserva de uma conta que já teve pagamento.";
+    // Gestão de reservas (Entrega 2.7) — erros de criar/editar/excluir/guardar/
+    // resgatar. A regra vive no domínio; aqui só a apresentação.
+    case "NOME_INVALIDO":
+      return "Dê um nome para a reserva.";
+    case "ALVO_INVALIDO":
+      return "A meta precisa ser um valor maior que zero.";
+    case "RESERVA_INEXISTENTE":
+      return "Não encontramos essa reserva. Atualize a página e tente de novo.";
+    case "RESERVA_COM_VINCULO":
+      return "Essa reserva está ligada a uma conta a pagar. Desfaça o vínculo antes de excluí-la.";
+    case "VALOR_ACIMA_DO_SALDO_RESERVA":
+      return "Você está tentando resgatar mais do que guardou nessa reserva.";
     default:
       return "Não foi possível salvar o lançamento. Confira os dados e tente de novo.";
   }

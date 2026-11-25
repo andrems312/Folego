@@ -162,4 +162,35 @@ describe("mensagemDeErro", () => {
       expect(mensagemDeErro(codigo)).not.toBe(padrao);
     }
   });
+
+  it("mapeia os erros de gestão de reservas (Entrega 2.7)", () => {
+    expect(mensagemDeErro("NOME_INVALIDO")).toMatch(/nome/i);
+    expect(mensagemDeErro("ALVO_INVALIDO")).toMatch(/meta/i);
+    expect(mensagemDeErro("RESERVA_INEXISTENTE")).toMatch(/não encontramos/i);
+    expect(mensagemDeErro("RESERVA_COM_VINCULO")).toMatch(
+      /ligada a uma conta|desfaça o vínculo/i,
+    );
+    expect(mensagemDeErro("VALOR_ACIMA_DO_SALDO_RESERVA")).toMatch(
+      /mais do que guardou/i,
+    );
+  });
+
+  it("preserva o mapeamento de ID_INVALIDO e ID_DUPLICADO", () => {
+    expect(mensagemDeErro("ID_INVALIDO")).toMatch(/tente de novo/i);
+    expect(mensagemDeErro("ID_DUPLICADO")).toMatch(/tente de novo/i);
+  });
+
+  it("os códigos de reserva não caem na mensagem padrão", () => {
+    const padrao = mensagemDeErro("QUALQUER_OUTRO");
+    const codigos = [
+      "NOME_INVALIDO",
+      "ALVO_INVALIDO",
+      "RESERVA_INEXISTENTE",
+      "RESERVA_COM_VINCULO",
+      "VALOR_ACIMA_DO_SALDO_RESERVA",
+    ];
+    for (const codigo of codigos) {
+      expect(mensagemDeErro(codigo)).not.toBe(padrao);
+    }
+  });
 });
