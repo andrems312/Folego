@@ -114,6 +114,71 @@ describe("ações do store integradas ao domínio", () => {
     expect(over.ok).toBe(false);
     if (!over.ok) expect(over.codigo).toBe("VALOR_ACIMA_DO_SALDO_RESERVA");
   });
+
+  it("criarReserva: comita uma vez, injeta o id da borda e começa zerada", () => {
+    const c = cenario({ inicial: { reservas: [] } });
+    const r = c.acoes.criarReserva({ nome: "Emergência", alvo: 120_000 });
+    expect(r.ok).toBe(true);
+    expect(c.commits).toHaveLength(1);
+    const reserva = c.atual().reservas[0];
+    expect(reserva?.id).toBe("id-1"); // gerado na borda do store
+    expect(reserva?.nome).toBe("Emergência");
+    expect(reserva?.alvo).toBe(120_000);
+    expect(reserva?.saldoAtual).toBe(0);
+  });
+
+  it("criarReserva inválida (nome vazio) NÃO comita nem gera id", () => {
+    const c = cenario({ inicial: { reservas: [] } });
+    const r = c.acoes.criarReserva({ nome: "   " });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.codigo).toBe("NOME_INVALIDO");
+    expect(c.commits).toHaveLength(0);
+  });
+
+  it("editarReserva: altera nome/alvo preservando o saldo", () => {
+    const c = cenario(); // reserva r1, saldo 80.000
+    const r = c.acoes.editarReserva("r1", { nome: "Tributos", alvo: 150_000 });
+    expect(r.ok).toBe(true);
+    expect(c.commits).toHaveLength(1);
+    const reserva = c.atual().reservas.find((x) => x.id === "r1");
+    expect(reserva?.nome).toBe("Tributos");
+    expect(reserva?.alvo).toBe(150_000);
+    expect(reserva?.saldoAtual).toBe(80_000);
+  });
+
+  it("editarReserva inexistente é rejeitada e não comita", () => {
+    const c = cenario();
+    const r = c.acoes.editarReserva("fantasma", { nome: "X" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.codigo).toBe("RESERVA_INEXISTENTE");
+    expect(c.commits).toHaveLength(0);
+  });
+
+  it("excluirReserva sem vínculo remove e libera o comprometido", () => {
+    const c = cenario(); // reserva r1 saldo 80.000, sem movimentações
+    const r = c.acoes.excluirReserva("r1");
+    expect(r.ok).toBe(true);
+    expect(c.atual().reservas).toHaveLength(0);
+    expect(totalReservas(c.atual())).toBe(0);
+  });
+
+  it("excluirReserva com conta vinculada é bloqueada pelo domínio", () => {
+    const c = cenario();
+    c.acoes.adicionar({
+      tipo: "saida",
+      valor: 50_000,
+      data: "2026-03-10",
+      categoriaId: "impostos",
+      status: "pendente",
+      reservaId: "r1",
+    });
+    const antesCommits = c.commits.length;
+    const r = c.acoes.excluirReserva("r1");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.codigo).toBe("RESERVA_COM_VINCULO");
+    expect(c.commits).toHaveLength(antesCommits); // nenhum commit novo
+    expect(c.atual().reservas).toHaveLength(1); // reserva intacta
+  });
 });
 
 describe("gating — ações só executam no estado 'pronto'", () => {
@@ -144,7 +209,12 @@ describe("gating — ações só executam no estado 'pronto'", () => {
     expect(c.acoes.excluir("x").ok).toBe(false);
     expect(c.acoes.guardarEmReserva("r1", 100).ok).toBe(false);
     expect(c.acoes.resgatarDeReserva("r1", 100).ok).toBe(false);
+    expect(c.acoes.criarReserva({ nome: "Nova" }).ok).toBe(false);
+    expect(c.acoes.editarReserva("r1", { nome: "X" }).ok).toBe(false);
+    expect(c.acoes.excluirReserva("r1").ok).toBe(false);
     expect(c.commits).toHaveLength(0);
+    // Nenhum id gerado => os thunks do domínio nem rodaram (gating antes do domínio).
+    expect(c.idsGerados()).toBe(0);
   });
 
   it("em pronto: a ação executa normalmente", () => {

@@ -9,8 +9,11 @@
  */
 import {
   adicionarMovimentacao,
+  criarReserva,
   editarMovimentacao,
+  editarReserva,
   excluirMovimentacao,
+  excluirReserva,
   guardarNaReserva,
   receberEntrada,
   registrarPagamento,
@@ -18,10 +21,12 @@ import {
 } from "@/domain";
 import type {
   AlteracoesMovimentacao,
+  AlteracoesReserva,
   Centavos,
   CodigoErro,
   EstadoFinanceiro,
   NovaMovimentacao,
+  NovaReserva,
   ResultadoOperacao,
 } from "@/domain";
 
@@ -41,6 +46,9 @@ export interface Acoes {
   excluir(movimentacaoId: string): ResultadoAcao;
   guardarEmReserva(reservaId: string, valor: Centavos): ResultadoAcao;
   resgatarDeReserva(reservaId: string, valor: Centavos): ResultadoAcao;
+  criarReserva(dados: Omit<NovaReserva, "id">): ResultadoAcao;
+  editarReserva(reservaId: string, alteracoes: AlteracoesReserva): ResultadoAcao;
+  excluirReserva(reservaId: string): ResultadoAcao;
 }
 
 export function criarAcoes(
@@ -79,5 +87,11 @@ export function criarAcoes(
       executar(() => guardarNaReserva(obterEstado(), reservaId, valor)),
     resgatarDeReserva: (reservaId, valor) =>
       executar(() => resgatarDaReserva(obterEstado(), reservaId, valor)),
+    criarReserva: (dados) =>
+      executar(() => criarReserva(obterEstado(), { ...dados, id: gerarId() })),
+    editarReserva: (reservaId, alteracoes) =>
+      executar(() => editarReserva(obterEstado(), reservaId, alteracoes)),
+    excluirReserva: (reservaId) =>
+      executar(() => excluirReserva(obterEstado(), reservaId)),
   };
 }
