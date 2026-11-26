@@ -55,7 +55,10 @@ test("período personalizado mostra os indicadores com valores corretos", async 
 
   await expect(page.getByText(/R\$\s*3\.000,00/)).toBeVisible(); // Recebidas
   await expect(page.getByText(/R\$\s*2\.000,00/)).toBeVisible(); // A receber
-  await expect(page.getByText(/R\$\s*500,00/)).toBeVisible(); // Pagas
+  // "Pagas" (500,00) também aparece no gráfico; escopa à linha do resumo.
+  await expect(
+    page.locator("xpath=//dt[normalize-space(.)='Pagas']/following-sibling::dd[1]"),
+  ).toHaveText(/R\$\s*500,00/);
   await expect(page.getByText(/R\$\s*400,00/)).toBeVisible(); // A pagar
   await expect(page.getByText(/R\$\s*200,00/)).toBeVisible(); // Retiradas
   await expect(page.getByText(/R\$\s*2\.300,00/)).toBeVisible(); // Resultado (3000−500−200)
@@ -168,6 +171,197 @@ test("responsivo mobile: sem overflow horizontal", async ({ page }) => {
   await page.goto("/relatorios");
 
   await expect(page.getByText("Resultado do período")).toBeVisible();
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+/* ======================================================================
+ * Etapa C — Gráfico de despesas por categoria
+ * ==================================================================== */
+
+async function abrirMarco2026(page: Page) {
+  await page.getByRole("button", { name: "Personalizado" }).click();
+  await page.getByLabel("Início").fill("2026-03-01");
+  await page.getByLabel("Fim").fill("2026-03-31");
+}
+
+function grafico(page: Page) {
+  return page.getByRole("figure", { name: /Para onde o dinheiro foi/ });
+}
+
+test("gráfico: múltiplas categorias, ordenação, valores e retiradas de fora", async ({
+  page,
+}) => {
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "mat", tipo: "saida", valor: 60_000, data: "2026-03-05", categoriaId: "materiais", status: "realizado" },
+      { id: "fer", tipo: "saida", valor: 30_000, data: "2026-03-10", categoriaId: "ferramentas", status: "realizado" },
+      { id: "imp", tipo: "saida", valor: 15_000, data: "2026-03-15", categoriaId: "impostos", status: "realizado" },
+      { id: "des", tipo: "saida", valor: 3_000, data: "2026-03-20", categoriaId: "deslocamento", status: "realizado" },
+      // Retirada — NÃO pode aparecer no gráfico de despesas.
+      { id: "ret", tipo: "retirada", valor: 50_000, data: "2026-03-18", categoriaId: "retirada", status: "realizado" },
+      // Saída pendente — só o pago entra no gráfico.
+      { id: "pend", tipo: "saida", valor: 99_999, data: "2026-03-25", categoriaId: "materiais", status: "pendente" },
+    ],
+  });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  const fig = grafico(page);
+  await expect(fig).toBeVisible();
+
+  // Total das despesas pagas = 600+300+150+30 = 1.080,00 (não inclui retirada).
+  await expect(fig.locator("figcaption").getByText(/R\$\s*1\.080,00/)).toBeVisible();
+
+  // Valores por categoria (só o pago; pendente de materiais não soma).
+  await expect(fig.locator("li", { hasText: "Materiais" }).getByText(/R\$\s*600,00/)).toBeVisible();
+  await expect(fig.locator("li", { hasText: "Ferramentas" }).getByText(/R\$\s*300,00/)).toBeVisible();
+  await expect(fig.locator("li", { hasText: "Impostos" }).getByText(/R\$\s*150,00/)).toBeVisible();
+  await expect(
+    fig.locator("li", { hasText: "Deslocamento" }).getByText(/R\$\s*30,00/),
+  ).toBeVisible();
+
+  // Ordenação do maior para o menor.
+  const nomes = await fig.locator("ul > li").evaluateAll((lis) =>
+    lis.map((li) => li.querySelector("span")?.textContent?.split(" ·")[0] ?? ""),
+  );
+  expect(nomes).toEqual([
+    "Materiais",
+    "Ferramentas",
+    "Impostos",
+    "Deslocamento/combustível",
+  ]);
+
+  // Retirada fica fora do gráfico (não há "Retirada pessoal" nem R$ 500,00 aqui).
+  await expect(fig.getByText("Retirada pessoal")).toHaveCount(0);
+  await expect(fig.getByText(/R\$\s*500,00/)).toHaveCount(0);
+  // Mas a retirada aparece no resumo (fora da figura).
+  await expect(page.getByText(/R\$\s*500,00/)).toBeVisible();
+});
+
+test("gráfico: proporção das barras relativa à maior despesa", async ({ page }) => {
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "mat", tipo: "saida", valor: 60_000, data: "2026-03-05", categoriaId: "materiais", status: "realizado" },
+      { id: "fer", tipo: "saida", valor: 30_000, data: "2026-03-10", categoriaId: "ferramentas", status: "realizado" },
+    ],
+  });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  const fig = grafico(page);
+  // A maior (materiais) ocupa 100%; ferramentas (metade) ocupa 50%.
+  const barraMat = fig.locator("li", { hasText: "Materiais" }).locator("rect").last();
+  const barraFer = fig.locator("li", { hasText: "Ferramentas" }).locator("rect").last();
+  await expect(barraMat).toHaveAttribute("width", "100%");
+  await expect(barraFer).toHaveAttribute("width", "50%");
+});
+
+test("gráfico: categoria única ocupa a barra inteira", async ({ page }) => {
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "imp", tipo: "saida", valor: 25_000, data: "2026-03-10", categoriaId: "impostos", status: "realizado" },
+    ],
+  });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  const fig = grafico(page);
+  await expect(fig.locator("ul > li")).toHaveCount(1);
+  await expect(fig.getByText("Impostos")).toBeVisible();
+  await expect(
+    fig.locator("li", { hasText: "Impostos" }).getByText(/R\$\s*250,00/),
+  ).toBeVisible();
+  await expect(
+    fig.locator("li", { hasText: "Impostos" }).locator("rect").last(),
+  ).toHaveAttribute("width", "100%");
+});
+
+test("gráfico: valor pequeno continua visível (piso da barra)", async ({ page }) => {
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "mat", tipo: "saida", valor: 100_000, data: "2026-03-05", categoriaId: "materiais", status: "realizado" },
+      { id: "imp", tipo: "saida", valor: 1_000, data: "2026-03-10", categoriaId: "impostos", status: "realizado" }, // 1% do maior
+    ],
+  });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  const fig = grafico(page);
+  // 1% ficaria quase invisível; o piso garante 2%.
+  await expect(
+    fig.locator("li", { hasText: "Impostos" }).locator("rect").last(),
+  ).toHaveAttribute("width", "2%");
+});
+
+test("gráfico: período sem despesas pagas mostra o vazio editorial", async ({
+  page,
+}) => {
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      // Só entrada recebida e saída pendente: nenhuma despesa paga.
+      { id: "e", tipo: "entrada", valor: 100_000, data: "2026-03-10", categoriaId: "servicos", status: "realizado" },
+      { id: "s", tipo: "saida", valor: 40_000, data: "2026-03-12", categoriaId: "materiais", status: "pendente" },
+    ],
+  });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  await expect(
+    page.getByText(/Não há despesas pagas neste período para detalhar por categoria/),
+  ).toBeVisible();
+  // Não renderiza barras artificiais.
+  await expect(grafico(page)).toHaveCount(0);
+});
+
+test("gráfico: descrição acessível com total e nº de categorias", async ({
+  page,
+}) => {
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "mat", tipo: "saida", valor: 60_000, data: "2026-03-05", categoriaId: "materiais", status: "realizado" },
+      { id: "fer", tipo: "saida", valor: 30_000, data: "2026-03-10", categoriaId: "ferramentas", status: "realizado" },
+    ],
+  });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  await expect(
+    grafico(page).getByText(/Total de R\$\s*900,00 em 2 categorias/),
+  ).toBeVisible();
+});
+
+test("gráfico: responsivo mobile sem overflow", async ({ page }) => {
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "mat", tipo: "saida", valor: 60_000, data: "2026-03-05", categoriaId: "materiais", status: "realizado" },
+      { id: "fer", tipo: "saida", valor: 30_000, data: "2026-03-10", categoriaId: "ferramentas", status: "realizado" },
+      { id: "imp", tipo: "saida", valor: 15_000, data: "2026-03-15", categoriaId: "impostos", status: "realizado" },
+    ],
+  });
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  await expect(grafico(page)).toBeVisible();
   const overflow = await page.evaluate(
     () =>
       document.documentElement.scrollWidth -

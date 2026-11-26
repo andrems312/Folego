@@ -14,6 +14,7 @@ import {
 } from "@/lib/periodo-relatorio";
 import { relatorioDoPeriodo } from "@/lib/relatorio";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
+import { GraficoDespesas } from "./grafico-despesas";
 import { SeletorPeriodo, type ModoPeriodo } from "./seletor-periodo";
 
 /**
@@ -172,6 +173,11 @@ export function ResumoRelatorio() {
           </div>
 
           <LegendaEstados />
+
+          <GraficoDespesas
+            despesas={relatorio.despesasPorCategoria}
+            total={relatorio.totalDespesasPagas}
+          />
         </>
       )}
 
