@@ -12,16 +12,31 @@ export const SEPARADOR_CSV = ";";
 export const BOM_UTF8 = "﻿";
 const FIM_LINHA = "\r\n";
 
-/** Prefixos que planilhas interpretam como fórmula (CSV Injection). */
-const PERIGOSO = /^[=+\-@\t\r]/;
+/** Caracteres que planilhas interpretam como início de fórmula. */
+const GATILHO_FORMULA = new Set(["=", "+", "-", "@"]);
 
 /**
- * Neutraliza um campo que começaria com caractere de fórmula, prefixando um
- * apóstrofo (convenção de planilha para "isto é texto"). Não altera o dado
- * original — só a representação exportada.
+ * Decide se um campo precisa ser neutralizado contra CSV Injection. Considera:
+ *  - início com caractere de controle (TAB, CR, LF e demais < 0x20), que algumas
+ *    planilhas descartam, revelando um gatilho logo atrás; e
+ *  - o primeiro caractere "visível" (ignorando espaços e controles à esquerda)
+ *    sendo `=`, `+`, `-` ou `@` — ou seja, gatilhos precedidos de espaço/controle
+ *    também são pegos.
+ */
+function precisaNeutralizar(valor: string): boolean {
+  if (valor.length === 0) return false;
+  if (valor.charCodeAt(0) < 0x20) return true; // TAB/CR/LF/controle no início
+  const visivel = valor.replace(/^[\s\u0000-\u001f]+/, "");
+  return GATILHO_FORMULA.has(visivel.charAt(0));
+}
+
+/**
+ * Neutraliza um campo que a planilha poderia interpretar como fórmula, prefixando
+ * um apóstrofo (convenção "isto é texto"). Não altera o dado original — só a
+ * representação exportada. Números válidos (começam com dígito) nunca são afetados.
  */
 export function protegerInjecao(valor: string): string {
-  return PERIGOSO.test(valor) ? `'${valor}` : valor;
+  return precisaNeutralizar(valor) ? `'${valor}` : valor;
 }
 
 /**

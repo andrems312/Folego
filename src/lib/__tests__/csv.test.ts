@@ -15,10 +15,27 @@ describe("protegerInjecao — CSV Injection", () => {
     expect(protegerInjecao("\tTAB")).toBe("'\tTAB");
   });
 
+  it("neutraliza gatilho precedido de espaços ou controle", () => {
+    expect(protegerInjecao(" =1+1")).toBe("' =1+1"); // espaço antes do =
+    expect(protegerInjecao("   @cmd")).toBe("'   @cmd");
+    expect(protegerInjecao("\r=cmd")).toBe("'\r=cmd"); // CR antes do =
+    expect(protegerInjecao("\n=cmd")).toBe("'\n=cmd"); // LF antes do =
+    expect(protegerInjecao("\u0001=x")).toBe("'\u0001=x"); // controle antes do =
+  });
+
+  it("neutraliza campo que começa com caractere de controle", () => {
+    expect(protegerInjecao("\tTAB")).toBe("'\tTAB");
+    expect(protegerInjecao("\u0007bip")).toBe("'\u0007bip");
+  });
+
   it("não altera texto e números comuns", () => {
     expect(protegerInjecao("Material")).toBe("Material");
     expect(protegerInjecao("1234,56")).toBe("1234,56");
+    expect(protegerInjecao("0,00")).toBe("0,00");
+    expect(protegerInjecao("20/03/2026")).toBe("20/03/2026");
     expect(protegerInjecao("Serviço nº 3")).toBe("Serviço nº 3");
+    expect(protegerInjecao("Conta 3 - parcela")).toBe("Conta 3 - parcela"); // hífen no meio
+    expect(protegerInjecao("")).toBe("");
   });
 });
 
