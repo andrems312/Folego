@@ -186,7 +186,7 @@ export function ResumoRelatorio() {
             total={relatorio.totalDespesasPagas}
           />
 
-          <TabelaRelatorio linhas={linhas} />
+          <TabelaRelatorio linhas={linhas} periodo={periodo} />
         </>
       )}
 

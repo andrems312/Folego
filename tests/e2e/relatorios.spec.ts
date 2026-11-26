@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -375,7 +376,7 @@ test("gráfico: responsivo mobile sem overflow", async ({ page }) => {
  * ==================================================================== */
 
 async function abrirTabela(page: Page) {
-  await page.getByText("Lançamentos do período", { exact: true }).click();
+  await page.getByText("Mostrar lançamentos", { exact: true }).click();
 }
 
 const SEED_MARCO = {
@@ -503,4 +504,85 @@ test("tabela: responsivo mobile usa listagem sem overflow", async ({ page }) => 
       document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+/* ======================================================================
+ * Etapa E — Exportação CSV
+ * ==================================================================== */
+
+async function baixarCSV(page: Page) {
+  const esperaDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Exportar CSV/ }).click();
+  const download = await esperaDownload;
+  const caminho = await download.path();
+  const conteudo = readFileSync(caminho, "utf8");
+  return { download, conteudo };
+}
+
+test("CSV: exporta o período com cabeçalho e valores corretos", async ({ page }) => {
+  await semearEstado(page, SEED_MARCO);
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  const { download, conteudo } = await baixarCSV(page);
+
+  expect(download.suggestedFilename()).toBe(
+    "folego-relatorio-2026-03-01-2026-03-31.csv",
+  );
+  // BOM UTF-8 e separador ';'.
+  expect(conteudo.startsWith("﻿")).toBe(true);
+  expect(conteudo).toContain(
+    "Data;Descrição;Tipo;Categoria;Realizado;Pendente;Status",
+  );
+  // Valores numéricos sem símbolo de moeda.
+  expect(conteudo).not.toContain("R$");
+  // Parcial: realizado e pendente separados.
+  expect(conteudo).toContain("Fornecedor Z;Saída;Materiais;300,00;700,00;Parcial");
+  // Entrada prevista: realizado 0, pendente com valor.
+  expect(conteudo).toContain("Serviço B;Entrada;Serviços prestados;0,00;2000,00;Previsto");
+  // Retirada identificada.
+  expect(conteudo).toContain("Pró-labore;Retirada;Retirada pessoal;200,00;0,00;Pago");
+  // Lançamento de fora do período não entra.
+  expect(conteudo).not.toContain("Fora do mês");
+});
+
+test("CSV: respeita o período selecionado (muda ao trocar)", async ({ page }) => {
+  const agora = new Date();
+  const hoje = isoLocal(agora);
+  const mesPassado = isoLocal(new Date(agora.getFullYear(), agora.getMonth() - 1, 15));
+
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "atual", tipo: "entrada", valor: 100_000, data: hoje, categoriaId: "servicos", status: "realizado", descricao: "Deste mes" },
+      { id: "anterior", tipo: "entrada", valor: 500_000, data: mesPassado, categoriaId: "servicos", status: "realizado", descricao: "Do mes passado" },
+    ],
+  });
+  await page.goto("/relatorios");
+
+  const atual = await baixarCSV(page);
+  expect(atual.conteudo).toContain("Deste mes");
+  expect(atual.conteudo).not.toContain("Do mes passado");
+  expect(atual.download.suggestedFilename()).toMatch(
+    /^folego-relatorio-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/,
+  );
+
+  await page.getByRole("button", { name: "Mês passado" }).click();
+  const anterior = await baixarCSV(page);
+  expect(anterior.conteudo).toContain("Do mes passado");
+  expect(anterior.conteudo).not.toContain("Deste mes");
+});
+
+test("CSV: botão exporta no mobile", async ({ page }) => {
+  await semearEstado(page, SEED_MARCO);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+
+  const { download, conteudo } = await baixarCSV(page);
+  expect(download.suggestedFilename()).toBe(
+    "folego-relatorio-2026-03-01-2026-03-31.csv",
+  );
+  expect(conteudo).toContain("Pró-labore;Retirada;Retirada pessoal;200,00;0,00;Pago");
 });

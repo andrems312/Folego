@@ -5,7 +5,9 @@ import { formatBRL } from "@/domain";
 import type { Centavos } from "@/domain";
 import { cn } from "@/lib/cn";
 import { formatarDataCurta } from "@/lib/formato-data";
+import type { PeriodoRelatorio } from "@/lib/relatorio";
 import type { LinhaRelatorio } from "@/lib/relatorio-tabela";
+import { BotaoExportarCSV } from "./botao-exportar-csv";
 
 /**
  * Tabela detalhada dos lançamentos do período (Entrega 2.8 / Etapa D).
@@ -17,7 +19,13 @@ import type { LinhaRelatorio } from "@/lib/relatorio-tabela";
  * scroll horizontal. Não há totalizador: somar entradas, saídas e retiradas numa
  * única linha seria incoerente; os totais coerentes ficam no resumo acima.
  */
-export function TabelaRelatorio({ linhas }: { linhas: LinhaRelatorio[] }) {
+export function TabelaRelatorio({
+  linhas,
+  periodo,
+}: {
+  linhas: LinhaRelatorio[];
+  periodo: PeriodoRelatorio;
+}) {
   const tituloId = useId();
   const [aberto, setAberto] = useState(false);
 
@@ -41,24 +49,25 @@ export function TabelaRelatorio({ linhas }: { linhas: LinhaRelatorio[] }) {
 
   return (
     <section aria-labelledby={tituloId} className="border-t border-line pt-4">
+      {/* Cabeçalho do bloco: título + exportação CSV no topo (DESIGN §8.8). */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id={tituloId} className="font-ui text-sm text-ink-2">
+            Lançamentos do período
+          </h2>
+          <p className="font-ui text-xs text-ink-3">
+            {n} {n === 1 ? "lançamento" : "lançamentos"}
+          </p>
+        </div>
+        <BotaoExportarCSV linhas={linhas} periodo={periodo} />
+      </div>
+
       <details
-        className="group"
+        className="group mt-3"
         onToggle={(e) => setAberto((e.currentTarget as HTMLDetailsElement).open)}
       >
-        <summary className="flex cursor-pointer list-none items-baseline gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-          <span id={tituloId} className="font-ui text-sm text-ink-2">
-            Lançamentos do período
-          </span>
-          <span className="font-ui text-xs text-ink-3">
-            · {n} {n === 1 ? "lançamento" : "lançamentos"}
-          </span>
-          <span
-            aria-hidden="true"
-            className="ml-auto font-ui text-xs text-forecast"
-          >
-            <span className="group-open:hidden">mostrar</span>
-            <span className="hidden group-open:inline">ocultar</span>
-          </span>
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm font-ui text-sm text-forecast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+          {aberto ? "Ocultar lançamentos" : "Mostrar lançamentos"}
         </summary>
 
         {aberto && (
