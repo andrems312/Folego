@@ -13,9 +13,11 @@ import {
   periodoValido,
 } from "@/lib/periodo-relatorio";
 import { relatorioDoPeriodo } from "@/lib/relatorio";
+import { linhasDoPeriodo } from "@/lib/relatorio-tabela";
 import { useFinanceiro } from "@/state/estado-financeiro-provider";
 import { GraficoDespesas } from "./grafico-despesas";
 import { SeletorPeriodo, type ModoPeriodo } from "./seletor-periodo";
+import { TabelaRelatorio } from "./tabela-relatorio";
 
 /**
  * Resumo dos Relatórios (Entrega 2.8 / Etapa B): seleção de período + indicadores
@@ -44,6 +46,11 @@ export function ResumoRelatorio() {
 
   const relatorio = useMemo(
     () => relatorioDoPeriodo(estado.movimentacoes, periodo),
+    [estado.movimentacoes, periodo],
+  );
+
+  const linhas = useMemo(
+    () => linhasDoPeriodo(estado.movimentacoes, periodo),
     [estado.movimentacoes, periodo],
   );
 
@@ -178,6 +185,8 @@ export function ResumoRelatorio() {
             despesas={relatorio.despesasPorCategoria}
             total={relatorio.totalDespesasPagas}
           />
+
+          <TabelaRelatorio linhas={linhas} />
         </>
       )}
 

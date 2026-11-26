@@ -369,3 +369,138 @@ test("gráfico: responsivo mobile sem overflow", async ({ page }) => {
   );
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+/* ======================================================================
+ * Etapa D — Tabela detalhada dos lançamentos
+ * ==================================================================== */
+
+async function abrirTabela(page: Page) {
+  await page.getByText("Lançamentos do período", { exact: true }).click();
+}
+
+const SEED_MARCO = {
+  ...SO_ABERTURA,
+  reservas: [],
+  movimentacoes: [
+    { id: "ea", tipo: "entrada", valor: 300_000, data: "2026-03-10", categoriaId: "servicos", status: "realizado", descricao: "Serviço A" },
+    { id: "eb", tipo: "entrada", valor: 200_000, data: "2026-03-20", categoriaId: "servicos", status: "pendente", descricao: "Serviço B" },
+    { id: "sx", tipo: "saida", valor: 50_000, data: "2026-03-05", categoriaId: "materiais", status: "realizado", descricao: "Material X" },
+    { id: "sy", tipo: "saida", valor: 40_000, data: "2026-03-25", categoriaId: "ferramentas", status: "pendente", descricao: "Ferramenta Y" },
+    { id: "sz", tipo: "saida", valor: 100_000, valorPago: 30_000, data: "2026-03-12", categoriaId: "materiais", status: "pendente", descricao: "Fornecedor Z" },
+    { id: "rr", tipo: "retirada", valor: 20_000, data: "2026-03-18", categoriaId: "retirada", status: "realizado", descricao: "Pró-labore" },
+    // Fora do período:
+    { id: "fora", tipo: "entrada", valor: 999_999, data: "2026-04-02", categoriaId: "servicos", status: "realizado", descricao: "Fora do mês" },
+  ],
+};
+
+test("tabela: lançamentos do período, filtro, valores realizado/pendente", async ({
+  page,
+}) => {
+  await semearEstado(page, SEED_MARCO);
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+  await abrirTabela(page);
+
+  const tabela = page.getByRole("table");
+  await expect(tabela).toBeVisible();
+
+  // 6 lançamentos no período (o de abril fica de fora).
+  await expect(tabela.locator("tbody tr")).toHaveCount(6);
+  await expect(tabela.getByText("Fora do mês")).toHaveCount(0);
+
+  // Pagamento parcial: realizado −R$300,00 e pendente R$700,00 na mesma linha.
+  const parcial = tabela.locator("tr", { hasText: "Fornecedor Z" });
+  await expect(parcial.getByText(/R\$\s*300,00/)).toBeVisible();
+  await expect(parcial.getByText(/R\$\s*700,00/)).toBeVisible();
+
+  // Entrada prevista: pendente R$2.000,00 (não é recebida).
+  const prevista = tabela.locator("tr", { hasText: "Serviço B" });
+  await expect(prevista.getByText(/R\$\s*2\.000,00/)).toBeVisible();
+
+  // Saída a pagar: pendente R$400,00.
+  await expect(
+    tabela.locator("tr", { hasText: "Ferramenta Y" }).getByText(/R\$\s*400,00/),
+  ).toBeVisible();
+
+  // Retirada identificada como retirada, com a categoria própria.
+  const retirada = tabela.locator("tr", { hasText: "Pró-labore" });
+  await expect(retirada.getByText("Retirada", { exact: true })).toBeVisible();
+  await expect(retirada.getByText("Retirada pessoal")).toBeVisible();
+  await expect(retirada.getByText(/R\$\s*200,00/)).toBeVisible();
+});
+
+test("tabela: ordenação do mais recente ao mais antigo", async ({ page }) => {
+  await semearEstado(page, SEED_MARCO);
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+  await abrirTabela(page);
+
+  const descricoes = await page
+    .getByRole("table")
+    .locator("tbody tr td:nth-child(2)")
+    .allInnerTexts();
+  expect(descricoes).toEqual([
+    "Ferramenta Y", // 25
+    "Serviço B", // 20
+    "Pró-labore", // 18
+    "Fornecedor Z", // 12
+    "Serviço A", // 10
+    "Material X", // 05
+  ]);
+});
+
+test("tabela: estrutura acessível (cabeçalhos de coluna)", async ({ page }) => {
+  await semearEstado(page, SEED_MARCO);
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+  await abrirTabela(page);
+
+  for (const nome of ["Data", "Descrição", "Tipo", "Categoria", "Realizado", "Pendente"]) {
+    await expect(page.getByRole("columnheader", { name: nome })).toBeVisible();
+  }
+});
+
+test("tabela: atualiza ao trocar o período", async ({ page }) => {
+  const agora = new Date();
+  const hoje = isoLocal(agora);
+  const mesPassado = isoLocal(new Date(agora.getFullYear(), agora.getMonth() - 1, 15));
+
+  await semearEstado(page, {
+    ...SO_ABERTURA,
+    reservas: [],
+    movimentacoes: [
+      { id: "atual", tipo: "entrada", valor: 100_000, data: hoje, categoriaId: "servicos", status: "realizado", descricao: "Deste mês" },
+      { id: "anterior", tipo: "entrada", valor: 500_000, data: mesPassado, categoriaId: "servicos", status: "realizado", descricao: "Do mês passado" },
+    ],
+  });
+  await page.goto("/relatorios");
+  await abrirTabela(page);
+
+  const tabela = page.getByRole("table");
+  await expect(tabela.getByText("Deste mês")).toBeVisible();
+  await expect(tabela.getByText("Do mês passado")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Mês passado" }).click();
+  await expect(tabela.getByText("Do mês passado")).toBeVisible();
+  await expect(tabela.getByText("Deste mês")).toHaveCount(0);
+});
+
+test("tabela: responsivo mobile usa listagem sem overflow", async ({ page }) => {
+  await semearEstado(page, SEED_MARCO);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/relatorios");
+  await abrirMarco2026(page);
+  await abrirTabela(page);
+
+  // No mobile a tabela fica oculta; a listagem compacta mostra os mesmos dados.
+  await expect(page.getByRole("table")).toBeHidden();
+  await expect(page.locator("details ul").getByText("Fornecedor Z")).toBeVisible();
+  await expect(page.getByText(/Pendente R\$\s*700,00/)).toBeVisible();
+
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
